@@ -55,6 +55,11 @@ impl NeHeader {
         
         return Ok(bytemuck::cast(buf));
     }
+    /// Returns the check magic of [`NeHeader`].
+    /// 
+    /// # Errors
+    /// This function will return an error if header contains
+    /// unexpected magic number.
     pub fn check_magic(&self) -> io::Result<()> {
         return match self.e_magic {
             exe286::NE_CIGAM => Ok(()),

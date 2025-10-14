@@ -4,4 +4,4 @@ pub const NE_CIGAM: u16 = 0x4e45;
 // connect modules "files" here
 pub mod header;
 pub mod modtab; 
-
+pub mod segtab;

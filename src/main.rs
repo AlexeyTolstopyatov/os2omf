@@ -25,7 +25,9 @@ pub fn fill_header<TRead: Read + Seek>(reader: &mut TRead) -> Result<(), io::Err
 
     Ok(())
 }
-
+/// It will be Dynamic linked object later
+///  - rustc 1.88.0 (6b00bc388 2025-06-23)
+///  - bytemuck 1.24.0
 fn main() {
     let path = "D:\\TEST\\Windows2.1\\CALC.EXE";
     let mut reader = BufReader::new(File::open(path).unwrap());
@@ -39,7 +41,7 @@ fn main() {
     reader.seek(SeekFrom::Start(dos_header.e_lfanew as u64)).unwrap();
 
     let win_header = exe286::header::NeHeader::read(&mut reader).unwrap();
-    
+
     if !win_header.is_valid_magic() {
         return;
     }

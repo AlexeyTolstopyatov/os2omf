@@ -1,79 +1,100 @@
+use std::{
+    io::{self, Read},
+    u8,
+};
 use bytemuck::{Pod, Zeroable};
-use std::{io::{self, Read}, u8};
 
 pub const E_MAGIC: u16 = 0x5a4d;
 pub const E_CIGAM: u16 = 0x4d5a;
 pub const E_LFARLC: u16 = 0x40;
 ///
 /// Mark Zbikowski header of DOS programs
-/// 
+///
 /// transparent -> StructLayout=Explicit
 /// C           -> StructLayout=Sequential
 /// packed      -> Pack = 1
-/// 
-#[repr(C, packed)] 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
-struct MzHeader {
-    // DOS header
+///
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
+pub(crate) struct MzHeader {
+    /// MZ Header signature
     pub e_magic: u16,
-    pub e_cp: u16,
+    /// Bytes on last page of file
     pub e_cblp: u16,
-    pub e_relc: u16,
-    pub e_cphdr: u16,
-    pub e_minpar: u16,
-    pub e_maxpar: u16,
+    /// Pages in file
+    pub e_cp: u16,
+    /// Relocations
+    pub e_crlc: u16,
+    /// Size of header in paragraphs
+    pub e_cparhdr: u16,
+    /// Minimum extra paragraphs needed
+    pub e_minalloc: u16,
+    /// Maximum extra paragraphs needed
+    pub e_maxalloc: u16,
+    /// Initial (relative) SS value
     pub e_ss: u16,
+    /// Initial SP value
     pub e_sp: u16,
-    pub e_crc: u32,
+    /// Checksum
+    pub e_crc: u16,
+    /// Initial IP value
     pub e_ip: u16,
+    /// Initial (relative) CS value
     pub e_cs: u16,
+    /// File address of relocation table
     pub e_lfarlc: u16,
+    /// Overlay number
     pub e_ovno: u16,
-    pub e_res_1: [u16; 4], // <-- _'ll become [0,0,0,0]
+    /// Reserved words
+    pub e_res: [u16; 4],
+    /// OEM identifier (for e_oeminfo)
     pub e_oemid: u16,
+    /// OEM information; e_oemid specific
     pub e_oeminfo: u16,
-    pub e_res_2: [u16; 10],
+    /// Reserved words
+    pub e_res2: [u16; 10],
+    /// Offset to extended header
     pub e_lfanew: u32,
 }
-
 impl MzHeader {
     ///
-    /// Fills header from target file using prepared 
+    /// Fills header from target file using prepared
     /// binary reader instance.
-    /// 
+    ///
     /// @returns filled MZ executable header
-    /// 
-    pub fn read<R: Read>(r: &mut R) -> io::Result<Self> {
+    ///
+    pub fn read<TRead: Read>(r: &mut TRead) -> io::Result<Self> {
         let mut buf = [0; 0x40];
         r.read_exact(&mut buf)?;
 
-        return Ok(bytemuck::cast(buf));
+
+        Ok(bytemuck::cast(buf))
     }
     ///
-    /// Tries to checkout signature of PC-DOS 
+    /// Tries check out signature of PC-DOS
     /// x86 real-mode executable
-    /// 
+    ///
     /// @return: Optional value with Some(unit) or an io::Error prepared instance
     ///  
-    pub fn validate(&self) -> io::Result<()> {
-        return match self.e_magic {
-            E_CIGAM => Ok(()),
-            E_MAGIC => Ok(()),
-            _ => Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "missing realmode executable header"
-            ))
-        };
+    pub fn has_valid_magic(&self) -> bool {
+        match self.e_magic {
+            E_CIGAM => true,
+            E_MAGIC => true,
+            _ => false,
+        }
     }
     ///
     /// Tries to validate checksum set in the MZ header
-    /// 
+    ///
     /// @returns: Some(unit) or prepared io::Error instance
-    /// 
-    pub fn validate_crc(buffer: &[u8]) -> io::Result<()> {
+    ///
+    pub fn has_valid_crc(self) -> bool {
         let mut pos: usize = 0;
         let mut sum: u16 = 0;
-        
+
+        let crc_copied = self.e_crc; // unaligned structures are unsafe
+        let buffer = bytemuck::bytes_of(&crc_copied);
+
         while pos < buffer.len() {
             // iterate each buffer element
             let word: [u8; 2] = [buffer[pos], *buffer.get(pos + 1).unwrap_or(&0)];
@@ -82,21 +103,21 @@ impl MzHeader {
             pos += 2;
         }
 
-        return match sum {
-            0 => Ok(()),
-            _ => Err(io::Error::new(io::ErrorKind::InvalidData, "unexpected crc value"))
-        };
+        match sum {
+            0 => true,
+            _ => false,
+        }
     }
     ///
     /// For some reason since the NE (New segmented executables)
     /// the MZ relocations table pointer always set at 0x40 absolute offset
-    /// by default. 
+    /// by default.
     /// Without some extern reason pointer to the MZ relocations table
-    /// not changes. 
-    /// 
+    /// not changes.
+    ///
     /// @returns: boolean flag of "linker set relocations pointer".
-    ///  
+    ///
     pub fn has_default_rlcptr(&self) -> bool {
-        return self.e_lfarlc == E_LFARLC;
+        self.e_lfarlc == E_LFARLC
     }
 }

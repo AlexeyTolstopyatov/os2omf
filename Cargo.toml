@@ -4,6 +4,4 @@ version = "0.1.0"
 edition = "2024"
 authors = ["CoffeeLake (atolstopyatov2017@vk.com)"]
 [dependencies]
-log = "0.4.17"
-clap = { version = "4.3.0", features = ["derive"] }
-bytemuck = { version = "1.13.1", features = ["derive"] }
+bytemuck = { version = "1.24.0", features = ["derive"] }

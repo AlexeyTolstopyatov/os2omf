@@ -4,7 +4,7 @@ use std::io::{self, Read};
 /// Represents WORD records array where count of records defines
 /// in the IMAGE_OS2_HEADER or a NE Header -- `e_cmod`
 ///                                 |
-///     e_modtab is an relative     | e_lfanew + e_modtab = file offset
+///     e_modtab is relative        | e_lfanew + e_modtab = file offset
 ///     offset from NE header       |
 /// +---------------+ <-------------+
 /// | 0x0001        | <-- may be "MSG" = |03|__|__|__| (skip 4 bytes)
@@ -16,12 +16,12 @@ use std::io::{self, Read};
 /// 1) Select a 2nd offset (modtab[1] = 0x0004)
 /// 2) e_lfanew + e_imptab + modtab[1]
 /// 3) Read the Pascal-String
-pub(crate) struct NeModuleReferencesTable {
-    pub m_offsets: Vec::<u16>
+pub struct NeModuleReferencesTable {
+    pub m_offsets: Vec<u16>
 }
 
 impl NeModuleReferencesTable {
-    pub fn read<TRead : Read>(r: &mut TRead, cmod: u16) -> io::Result::<Self> {
+    pub fn read<TRead : Read>(r: &mut TRead, cmod: u16) -> io::Result<Self> {
         let mut references: Vec<u16> = Vec::<u16>::new();
         let mut buf: [u8; 2] = [0, 0];
         
@@ -30,8 +30,9 @@ impl NeModuleReferencesTable {
             references.push(bytemuck::cast(buf));
         }
 
-        return Ok(NeModuleReferencesTable { 
+        Ok(NeModuleReferencesTable { 
             m_offsets: references 
         })
     }
+    
 }

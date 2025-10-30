@@ -20,15 +20,15 @@ pub struct NeSegment {
 impl NeSegment {
     /// Reads the record in segments table
     /// without raw segment data.
-    pub fn read<R: Read>(r: &mut R, shift_count: u16) -> io::Result<Self> {
-        return Ok(Self {
+    pub fn read<TRead: Read>(r: &mut TRead, shift_count: u16) -> io::Result<Self> {
+        Ok(Self {
             header: NeSegmentHeader::read(r)?,
             shift_count,
             data: None,
-        });
+        })
     }
     /// Reads the segment data uses header information.
-    pub fn read_data<R: Read + Seek>(&mut self, r: &mut R) -> io::Result<()> {
+    pub fn read_data<TSeek: Read + Seek>(&mut self, r: &mut TSeek) -> io::Result<()> {
         if self.header.data_offset_shifted == 0 {
             return Ok(());
         }
@@ -47,18 +47,18 @@ impl NeSegment {
     }
 
     pub fn data_length(&self) -> u64 {
-        if self.header.data_length == 0 {
-            return 0x10000;
+        return if self.header.data_length == 0 {
+            0x10000
         } else {
-            return self.header.data_length as u64;
+            self.header.data_length as u64
         }
     }
 
     pub fn min_alloc(&self) -> u64 {
-        if self.header.min_alloc == 0 {
-            return 0x10000;
+        return if self.header.min_alloc == 0 {
+            0x10000
         } else {
-            return self.header.min_alloc as u64;
+            self.header.min_alloc as u64
         }
     }
 }
@@ -82,7 +82,7 @@ impl NeSegment {
 ///                                                 0 -> .DATA16  (read-write)
 ///                                                 1 -> .RDATA16 (read-only)
 /// Every segment has a rights to contain own relocations table,
-/// because this way to imagine the segments table is the most simple.
+/// because this way to imagine the segments table is most simple.
 /// 
 #[derive(Debug, Clone, Copy)]
 pub struct NeSegmentHeader {
@@ -91,35 +91,75 @@ pub struct NeSegmentHeader {
     pub flags: u16,
     pub min_alloc: u16,
 }
+///
+/// Segments in NE segmented executable are unnamed. Every segment
+/// has flags what describes it. Types following next don't try
+/// compare with sections in Portable Executable format but.
+///
+/// Portable Executables works in private process-memory and
+/// memory model is flat. Segmented memory model is significant
+/// thing.
+///
 pub enum NeSegmentRights {
     /// Rights of 16-bit .code segment
-    ///     - READABLE
-    ///     - EXECUTABLE
+    ///  - READABLE
+    ///  - EXECUTABLE
     CODE = 0,
     /// Rights of 16-bit .data segment
-    ///     - READABLE
-    ///     - WRITABLE
+    ///  - READABLE
+    ///  - WRITABLE
     DATA = 1,
-    /// Rights of 16-bit .rodata segment
-    ///     - READABLE
+    /// Rights of 16-bit .rdata segment
+    ///  - READABLE
     RDATA= 2,
+    ///
     /// My custom new-type of segment without
     /// embedded data. In original documents there's no
     /// any .bss named segments and all segments are unnamed by nature,
     /// Rights of 16-bit ~.bss~ data segment defines by the flags
+    ///
     BSS = 3
 }
 const SEG_HASMASK: u16 = 0x0007;
+///
+/// Segment marked as moveable can be moved into another segment
+/// after application loads into Windows memory.
+///
 const SEG_MOVABLE: u16 = 0x0010;
+///
+/// Data segments having this flag are read-only
+/// All segments marked as SEG_PRELOAD are loads in memory before
+/// Windows loader prepares to run application.
+///
 const SEG_PRELOAD: u16 = 0x0040;
+///
+/// If byte-mask of segment OR SEG_RELOCS gives true -
+/// next following data of segment is will be huge table of
+/// segment relocations. Per-segment relocations is very important tables
+/// which describe all inner-relocations and statically linked functions
+/// and dynamically linked libraries/functions/calls in run-time used in module.
+///
+/// If application requires FPU -> Windows emulates it and contains special
+/// marks in per-segment relocations named like "OS-Fixups".
+///
 const SEG_RELOCS:  u16 = 0x0100;
+///
+/// If segment marked as discardable - it can be unloaded
+/// after application runs.
+///
 const SEG_DISCARD: u16 = 0xF000;
 
 impl NeSegmentHeader {
-    pub fn read<TR: Read>(r: &mut TR) -> io::Result<Self> {
+    ///
+    /// Reads only one segment and fills unsafe unaligned structure
+    /// of one segment header
+    ///
+    pub fn read<TRead: Read>(r: &mut TRead) -> io::Result<Self> {
         let mut buf = [0; 0x8];
         r.read_exact(&mut buf)?;
-        let get_u16 = |pos| u16::from_le_bytes(buf[pos..pos + 2].try_into().unwrap());
+        let get_u16 = |pos| u16::from_le_bytes(buf[pos..pos + 2]
+            .try_into()
+            .unwrap());
 
         Ok(Self {
             data_offset_shifted: get_u16(0),
@@ -128,23 +168,24 @@ impl NeSegmentHeader {
             min_alloc: get_u16(6),
         })
     }
+    ///
+    /// Compares all byte-mask with current flags of
+    /// segment rights.
+    ///
     pub fn get_segment_rights(&self) -> NeSegmentRights {
         if self.data_offset_shifted == 0_u16 {
             return NeSegmentRights::BSS;
         }
 
-        return match (self.flags & SEG_HASMASK) == 0 {
+        match (self.flags & SEG_HASMASK) == 0 {
             true => NeSegmentRights::CODE,
             false => {
-                if (self.flags & SEG_PRELOAD) != 0 {
-                    return NeSegmentRights::RDATA;
+                return if (self.flags & SEG_PRELOAD) != 0 {
+                    NeSegmentRights::RDATA
                 } else {
-                    return NeSegmentRights::DATA;
+                    NeSegmentRights::DATA
                 }
             }
         }
-    }
-    pub fn get_segment_flags_list() {
-        
     }
 }

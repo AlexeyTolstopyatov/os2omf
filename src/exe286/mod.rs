@@ -5,3 +5,7 @@ pub const NE_CIGAM: u16 = 0x4e45;
 pub mod header;
 pub mod modtab; 
 pub mod segtab;
+pub mod segrelocs;
+pub mod enttab;
+pub mod nrestab;
+pub mod resntab;

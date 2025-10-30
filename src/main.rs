@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io;
 use std::io::{BufReader, Read, Seek, SeekFrom};
+use crate::exe286::header::NeHeader;
 use crate::exe286::NE_MAGIC;
 
 mod exe;
@@ -21,9 +22,6 @@ pub fn fill_header<TRead: Read + Seek>(reader: &mut TRead) -> Result<(), io::Err
     reader.seek(SeekFrom::Start(dos_header.e_lfanew as u64))?;
 
     let win_header = exe286::header::NeHeader::read(reader)?;
-    if win_header.e_magic != NE_MAGIC {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid header's magic signature"));
-    }
 
     Ok(())
 }
@@ -34,11 +32,16 @@ fn main() {
 
     let dos_header = exe::MzHeader::read(&mut reader).unwrap(); // dangerous!
     if !dos_header.has_valid_magic() {
-        // free buffer? or it init on the stack?
         return;
     }
     dbg!(dos_header);
 
+    reader.seek(SeekFrom::Start(dos_header.e_lfanew as u64)).unwrap();
+
     let win_header = exe286::header::NeHeader::read(&mut reader).unwrap();
+    
+    if !win_header.is_valid_magic() {
+        return;
+    }
     dbg!(win_header);
 }

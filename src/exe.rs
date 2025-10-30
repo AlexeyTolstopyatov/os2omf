@@ -88,12 +88,11 @@ impl MzHeader {
     ///
     /// @returns: Some(unit) or prepared io::Error instance
     ///
-    pub fn has_valid_crc(self) -> bool {
+    pub fn has_valid_crc(&self) -> bool {
         let mut pos: usize = 0;
         let mut sum: u16 = 0;
 
-        let crc_copied = self.e_crc; // unaligned structures are unsafe
-        let buffer = bytemuck::bytes_of(&crc_copied);
+        let buffer = bytemuck::bytes_of(&self.e_crc);
 
         while pos < buffer.len() {
             // iterate each buffer element

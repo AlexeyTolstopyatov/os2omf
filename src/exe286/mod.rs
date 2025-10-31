@@ -3,10 +3,11 @@ use std::io;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use crate::exe286::enttab::{Entry, EntryTable};
 use crate::exe286::header::NeHeader;
+use crate::exe286::modtab::NeModuleReferencesTable;
 use crate::exe286::nrestab::NonResidentNameTable;
 use crate::exe286::resntab::{ResidentNameEntry, ResidentNameTable};
 use crate::exe286::segrelocs::RelocationTable;
-use crate::exe286::segtab::NeSegment;
+use crate::exe286::segtab::{NeSegment, NeSegmentDllImportsTable};
 use crate::exe::MzHeader;
 
 pub const NE_MAGIC: u16 = 0x454e;
@@ -47,7 +48,7 @@ pub mod resntab;
 /// | .DATA segment 3 []        | in table if flags byte mask contains SEG_HASRELOC (0x0100)
 /// |                   +-------+ exists following next array of relocations.
 /// +-------------------+       |
-/// |        padding            | 
+/// |        padding            |
 /// +---------------------------+
 /// | 01 | 06 | 11 | 78 | 20 |  | **Module References Table**
 /// +----+----+-------+----+----+
@@ -67,58 +68,73 @@ pub mod resntab;
 /// | 11 | HELLO_WATCOM  | @2   | Just **Non-Resident names** (public exports)
 /// +---------------------------+ or unused by module exports
 /// 
-/// ``` 
+/// ```
 pub(crate) struct NeExecutableLayout {
     pub dos_header: MzHeader,
     pub new_header: NeHeader,
-    pub ent_table: EntryTable,
-    pub seg_table: Vec<NeSegment>,
+    pub ent_tab: EntryTable,
+    pub seg_tab: Vec<NeSegment>,
     pub nres_tab: NonResidentNameTable,
     pub resn_tab: ResidentNameTable,
+    pub mod_tab: NeModuleReferencesTable,
+    pub imp_tab: NeSegmentDllImportsTable
 }
 
 impl NeExecutableLayout {
     pub fn get(path: &str) -> io::Result<Self> {
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);
-        
+
         let dos_header = MzHeader::read(&mut reader)?;
         if !dos_header.has_valid_magic() {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid magic for dos_header"));
         }
-        
+
         reader.seek(SeekFrom::Start(dos_header.e_lfanew as u64))?;
-        
+
         if dos_header.e_lfanew == 0_u32 {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid e_lfanew for protected-mode executable"));
         }
-        
+
         let new_header = NeHeader::read(&mut reader)?;
         if  !new_header.is_valid_magic() {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid magic for protected-mode executable"));
         }
-        
+
         // Now we are extremely needed the e_lfanew just because
         // all pointers in Windows-OS/2 header are relative.
         // This is a chance to little compress data to NEAR pointers
-        
+
         reader.seek(SeekFrom::Start(new_header.e_nres_tab as u64))?;
         let nres_tab = NonResidentNameTable::read(&mut reader)?;
-        
+
         reader.seek(SeekFrom::Start((new_header.e_resn_tab as u32 + dos_header.e_lfanew) as u64))?;
         let resn_tab = ResidentNameTable::read(&mut reader)?;
-        
+
         reader.seek(SeekFrom::Start((new_header.e_ent_tab as u32 + dos_header.e_lfanew)as u64))?;
         let ent_table = EntryTable::read(&mut reader, new_header.e_cb_ent)?;
-        
+
         reader.seek(SeekFrom::Start((new_header.e_seg_tab as u32 + dos_header.e_lfanew) as u64))?;
         let mut sex = Vec::<NeSegment>::new();
         for i in 0..new_header.e_cseg {
             sex.push(NeSegment::read(&mut reader, i)?);
         }
         
-        let layout = NeExecutableLayout{};
+        reader.seek(SeekFrom::Start((new_header.e_mod_tab as u32 + dos_header.e_lfanew) as u64))?;
+        let mod_tab = NeModuleReferencesTable::read(&mut reader, new_header.e_cmod)?;
         
+        
+        
+        let layout = NeExecutableLayout{
+            dos_header,
+            new_header,
+            ent_tab: ent_table,
+            nres_tab,
+            resn_tab,
+            seg_tab: sex,
+            mod_tab
+        };
+
         Ok(layout)
     }
 }

@@ -161,7 +161,7 @@ impl RelocationTable {
                 _ => {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
-                        format!("Invalid relocation type: 0x{:02X}", reloc_type)),
+                        format!("invalid relocation type: 0x{:02X}", reloc_type)),
                     );
                 }
             };

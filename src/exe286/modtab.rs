@@ -3,6 +3,7 @@ use std::io::{self, Read};
 /// Module References Table 
 /// Represents WORD records array where count of records defines
 /// in the IMAGE_OS2_HEADER or a NE Header -- `e_cmod`
+/// ```
 ///                                 |
 ///     e_modtab is relative        | e_lfanew + e_modtab = file offset
 ///     offset from NE header       |
@@ -10,7 +11,7 @@ use std::io::{self, Read};
 /// | 0x0001        | <-- may be "MSG" = |03|__|__|__| (skip 4 bytes)
 /// | 0x0004        |     after "MSG" Pascal-String follows "KERNEL"
 /// | ...           |     Pascal-string (in example) 
-/// 
+/// ```
 /// Module references is an offsets from ImportNames Table start.
 /// To get the "KERNEL" module string you need to get an offset from e_modtab
 /// 1) Select a 2nd offset (modtab[1] = 0x0004)

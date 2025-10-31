@@ -1,4 +1,5 @@
 use std::io::{self, Read, Seek, SeekFrom};
+use std::io::SeekFrom::Start;
 use crate::exe286::segrelocs::RelocationTable;
 
 ///
@@ -24,29 +25,39 @@ impl NeSegment {
     /// Reads the record in segments table
     /// without raw segment data.
     pub fn read<TRead: Read + Seek>(r: &mut TRead, shift_count: u16) -> io::Result<Self> {
+        let align  = match shift_count {
+            0 => 9,
+            _ => shift_count
+        };
+
         let header = NeSegmentHeader::read(r)?;
         let mut relocs = RelocationTable { rel_entries: vec![] };
 
         if !header.relocations_stripped() {
-            relocs = Self::read_relocs(r, shift_count as u64, &header)
+            relocs = Self::read_relocs(r, shift_count as u64, &header)?
         }
 
         Ok(Self {
             header,
-            shift_count,
+            shift_count: align,
             data: None,
             relocs
         })
     }
-    fn read_relocs<TRead: Read + Seek>(r: &mut TRead, a: u64, h: &NeSegmentHeader) -> RelocationTable {
-        // header already exists in memory I suppose...
-        let position = h.data_offset(a) + h.data_length();
+    fn read_relocs<TRead: Read + Seek>(r: &mut TRead, a: u64, h: &NeSegmentHeader) -> io::Result<RelocationTable> {
+        let position = (h.data_offset_shifted as u64 * a) + h.data_length();
 
-        if (position + 2) as usize == r.bytes().count() {
-            RelocationTable { rel_entries: vec![] }
+        // bounds check
+        let current_pos = r.stream_position()?;
+        let file_len = r.seek(SeekFrom::End(0))?;
+        r.seek(SeekFrom::Start(current_pos))?;
+
+        if position + 2 > file_len {
+            return Ok(RelocationTable { rel_entries: vec![] });
         }
 
-
+        r.seek(SeekFrom::Start(position))?;
+        RelocationTable::read(r)
     }
     /// Reads the segment data uses header information.
     pub fn read_data<TSeek: Read + Seek>(&mut self, r: &mut TSeek) -> io::Result<()> {
@@ -180,7 +191,7 @@ impl NeSegmentHeader {
             return NeSegmentRights::BSS;
         }
 
-        match (self.flags & SEG_HASMASK) == 0 {
+        match (self.flags & SEG_HASMASK) != 0 {
             true => NeSegmentRights::CODE,
             false => {
                 if (self.flags & SEG_PRELOAD) != 0 {

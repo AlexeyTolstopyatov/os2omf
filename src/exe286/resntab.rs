@@ -1,4 +1,6 @@
 use std::io::{self, Read};
+use crate::types::PascalString;
+
 ///
 /// This table contains a list of ASCII strings.
 ///
@@ -33,7 +35,7 @@ impl ResidentNameTable {
 
 #[derive(Debug, Clone)]
 pub struct ResidentNameEntry {
-    pub name: Vec<u8>,
+    pub name: PascalString,
     pub ordinal: u16,
 }
 
@@ -58,6 +60,9 @@ impl ResidentNameEntry {
             r.read_exact(&mut buf)?;
             u16::from_le_bytes(buf)
         };
-        Ok(Some(Self { name, ordinal: index }))
+        Ok(Some(Self {
+            name: PascalString::new(len, name),
+            ordinal: index
+        }))
     }
 }

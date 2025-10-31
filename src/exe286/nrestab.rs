@@ -1,5 +1,7 @@
 // Non-Resident names table. (look at the header specs)
 use std::io::{self, Read};
+use crate::types::PascalString;
+
 ///
 /// This table contains a list of ASCII strings. 
 /// The first string is the module description from the module definition file. 
@@ -32,8 +34,8 @@ impl NonResidentNameTable {
 
 #[derive(Debug, Clone)]
 pub struct NonResidentNameEntry {
-    pub name: Vec<u8>,
-    pub index: u16,
+    pub name: PascalString,
+    pub ordinal: u16,
 }
 
 impl NonResidentNameEntry {
@@ -56,6 +58,6 @@ impl NonResidentNameEntry {
             r.read_exact(&mut buf)?;
             u16::from_le_bytes(buf)
         };
-        Ok(Some(Self { name, index }))
+        Ok(Some(Self { name: PascalString::new(len, name), ordinal: index }))
     }
 }

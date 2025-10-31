@@ -54,6 +54,55 @@ Operating Systems which uses `NE` executables
 Undocumented formats in this crate are really the same in most scopes
 and I still can't believe this is real. 
 
+Linear Executable (`LE`) format is a try to make a universal format
+of executables. Files linked as `LE` may contain 16-bit and 32-bit code
+inside. Physical scopes inside called as "Objects". This is a not clearly segments
+like in previous New executable files. One of segment may contain 32-bit code
+but another segment may contain 16-bit code.
+
+Each object in file must have been placed in special registered and allocated
+space in memory. This space calls "Object Page".
+
+Object page's size is a fixed, set in main header - value.
+Usually for Intel x86 linked `LE` objects it equals `4096` but
+any way it wolud be better if you look up at the filled header.
+
+"Communication" between objects can be implemented through
+the per-segment fixups. And the hardest structure of this file is 
+a "Fixup Records Table". But only from there we can know imports and internal/external
+relocation records.
+
+Operating Systems used `LE` executables:
+ - Microsoft Windows 3.x, (.386 Virtual xxx Drivers)
+ - Microsoft Windows 9x, (.386/.vxd Virtual xxx Drivers)
+ - IBM OS/2 2x (exactly ALL software)
+ - ~Microsoft~ OS/2 2.0 (exactly all software)
+
+System utilities what can produce/run Linear executables:
+ - Watcom/Open Watcom linker
+ - EMX linker and compiler?
+ - DOS Extenders
+
+Linear eXecutable format is a **standard** of OS/2 linked objects
+and programs. All well-known OS/2 family operating systems are fully
+built as LX executables. They are also contains 16-bit and 32-bit code
+inside. And concept of Objects and Intel 286 "CallGates" are still here.
+
+But `LX` objects are more difficult and extended instead of `LE` files.
+And based on the "Undocumented Windows File Formats" book:
+
+> [!NOTE]
+> "The LE format is actually based on, or at least very similar to, the LX file format
+used by OS/2 executables. In fact, all of the work in reverse-engineering the LE format
+was based on information available on the LX format"
+
+That's all.
+
+Operating Systems used LX executables:
+ - IBM OS/2 3.0
+ - IBM OS/2 4x
+ - eCOM Station
+ - ArcaNoae ArcaOS
 
 ### In the end
 

@@ -84,6 +84,7 @@ pub struct RelocationEntry {
 /// Relocation table is a sequence of defined
 /// relocation records.
 ///
+#[derive(Debug, Clone)]
 pub struct RelocationTable {
     pub rel_entries: Vec<RelocationEntry>,
 }

@@ -1,4 +1,6 @@
 use std::io::{self, Read, Seek, SeekFrom};
+use crate::exe286::segrelocs::RelocationTable;
+
 ///
 /// This table contains one 8-byte record for every code and data segment
 /// in the program or library module. 
@@ -15,57 +17,57 @@ pub struct NeSegment {
     pub header: NeSegmentHeader,
     pub shift_count: u16,
     pub data: Option<Vec<u8>>,
+    pub relocs: RelocationTable
 }
 
 impl NeSegment {
     /// Reads the record in segments table
     /// without raw segment data.
-    pub fn read<TRead: Read>(r: &mut TRead, shift_count: u16) -> io::Result<Self> {
+    pub fn read<TRead: Read + Seek>(r: &mut TRead, shift_count: u16) -> io::Result<Self> {
+        let header = NeSegmentHeader::read(r)?;
+        let mut relocs = RelocationTable { rel_entries: vec![] };
+
+        if !header.relocations_stripped() {
+            relocs = Self::read_relocs(r, shift_count as u64, &header)
+        }
+
         Ok(Self {
-            header: NeSegmentHeader::read(r)?,
+            header,
             shift_count,
             data: None,
+            relocs
         })
+    }
+    fn read_relocs<TRead: Read + Seek>(r: &mut TRead, a: u64, h: &NeSegmentHeader) -> RelocationTable {
+        // header already exists in memory I suppose...
+        let position = h.data_offset(a) + h.data_length();
+
+        if (position + 2) as usize == r.bytes().count() {
+            RelocationTable { rel_entries: vec![] }
+        }
+
+
     }
     /// Reads the segment data uses header information.
     pub fn read_data<TSeek: Read + Seek>(&mut self, r: &mut TSeek) -> io::Result<()> {
         if self.header.data_offset_shifted == 0 {
             return Ok(());
         }
-        let data_offset = self.data_offset();
-        let data_length = self.data_length();
+        let data_offset = self.header.data_offset(self.shift_count as u64);
+        let data_length = self.header.data_length();
         r.seek(SeekFrom::Start(data_offset))?;
         let mut data = vec![0; data_length as usize];
         r.read_exact(&mut data)?;
         self.data = Some(data);
         
-        return Ok(());
-    }
-    /// Computes real data offset 
-    pub fn data_offset(&self) -> u64 {
-        return (self.header.data_offset_shifted as u64) << self.shift_count;
-    }
-
-    pub fn data_length(&self) -> u64 {
-        return if self.header.data_length == 0 {
-            0x10000
-        } else {
-            self.header.data_length as u64
-        }
-    }
-
-    pub fn min_alloc(&self) -> u64 {
-        return if self.header.min_alloc == 0 {
-            0x10000
-        } else {
-            self.header.min_alloc as u64
-        }
+        Ok(())
     }
 }
 ///
 /// NE Segment header is a record in Segments table
 /// Like a PE32/+ files, NE executable images has a table of something which
-/// contains raw code or data.                 |
+/// contains raw code or data.
+/// ```
 ///                                            |
 /// +--------+--------+-------+----------+ <---+ e_lfanew + e_segtab
 /// | offset | length | flags | minalloc |
@@ -81,6 +83,7 @@ impl NeSegment {
 ///  or compressed segments       (flags & PRELOAD) + (flags & HASMASK)
 ///                                                 0 -> .DATA16  (read-write)
 ///                                                 1 -> .RDATA16 (read-only)
+/// ```
 /// Every segment has a rights to contain own relocations table,
 /// because this way to imagine the segments table is most simple.
 /// 
@@ -180,7 +183,7 @@ impl NeSegmentHeader {
         match (self.flags & SEG_HASMASK) == 0 {
             true => NeSegmentRights::CODE,
             false => {
-                return if (self.flags & SEG_PRELOAD) != 0 {
+                if (self.flags & SEG_PRELOAD) != 0 {
                     NeSegmentRights::RDATA
                 } else {
                     NeSegmentRights::DATA
@@ -188,4 +191,90 @@ impl NeSegmentHeader {
             }
         }
     }
+    ///
+    /// Remember the NE Header `e_align` field??
+    /// This is a main reason of usage this field. Per-segment relocations
+    /// depend hard on sector shifting
+    ///
+    pub fn data_offset(&self, alignment: u64) -> u64 {
+        (self.data_offset_shifted as u64) << alignment
+    }
+
+    pub fn data_length(&self) -> u64 {
+        if self.data_length == 0 {
+            0x10000
+        } else {
+            self.data_length as u64
+        }
+    }
+
+    pub fn min_alloc(&self) -> u64 {
+        if self.min_alloc == 0 {
+            0x10000
+        } else {
+            self.min_alloc as u64
+        }
+    }
+    pub fn relocations_stripped(&self) -> bool {
+        (self.flags & SEG_RELOCS) == 0
+    }
+}
+
+/// > This scheme is custom!
+/// It's not include in official documentation.
+pub struct DllImport {
+    /// ### Module's Name
+    /// Module's name after linker distorts and becomes `PASCALUPPERCASE`
+    /// Historically, Microsoft and IBM use `PascalCase` naming for procedures
+    /// and for functions written in C/++ modules. This rule figures out everywhere
+    /// but Microsoft LINK.EXE corrupts it.
+    ///
+    /// Module Names are not DLL file names! If you read my articles about or
+    /// Microsoft official manual for "Segmented Executables" module names implicitly
+    /// casts to a `@0` record in `ResidentNames` table. That's main reason why `@0`
+    /// ordinal is a reserved value.
+    ///
+    /// ```
+    /// KERNEL.EXE may contain "KERNEL" pascal string in resident names table
+    ///            by @0 ordinal. And this is a module name exactly.
+    ///
+    /// ```
+    ///
+    /// You can rename KERNEL.EXE to KERNEL.DLL or something else, but system's loader
+    /// looks up at the @0 ordinal **if module defined** _and_ **required to be loaded**
+    pub dll_name: String,
+    ///
+    /// ### Procedure's Name
+    ///
+    /// If you want to know more about it: pls read [it](https://alexeytolstopyatov.github.io/notes/2025/09/23/ne-imptab.html)
+    /// I've described all problems and base of it there.
+    pub name: String,
+    /// ### Procedure's Ordinal
+    /// Uses instead name if entry point is unnamed or
+    /// specially hidden by linker in special project file ".def"
+    ///
+    /// Exports in another modules declares the Name of entry point
+    /// and positioning index in the EntryTable. This index calls by others "ordinal".
+    ///
+    /// ```def
+    /// NAME        = 'hello' # I can not stand NULL terminator to the strings here.
+    ///                       # But for every string must have NULL terminator
+    /// DESCRIPTION = 'This project linked under Windows 11 and VSCode'
+    ///
+    /// STACKSIZE   = 1024
+    /// HEAPSIZE    = 4096
+    ///
+    /// EXPORTS
+    /// HelloWatcom @60  # <-- Will be placed to Non-Resident Names
+    ///                  #     as HELLOWATCOM by 60 position in EntryTable.
+    /// ```
+    pub ordinal: u16,
+    pub file_pointer: u64,
+}
+
+/// ### Imports extraction from segmented module
+/// Read [it](https://alexeytolstopyatov.github.io/notes/2025/09/23/ne-imptab.html) please
+/// if you really need to know how to define dynamic imports
+pub struct NeSegmentDllImportsTable {
+    pub imp_list: Vec<DllImport>,
 }

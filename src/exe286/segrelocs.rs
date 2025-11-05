@@ -11,8 +11,8 @@ pub struct InternalFixes {
 #[derive(Clone, Debug)]
 pub struct ImportOrdinal {
     /// Module index into ModuleReferences Table
-    pub imp_mod: u16,
-    pub imp_ord: u16,
+    pub imp_mod_index: u16,
+    pub imp_ordinal: u16,
 }
 #[derive(Clone, Debug)]
 pub struct ImportName {
@@ -128,8 +128,8 @@ impl RelocationTable {
                     let ordinal = u16::from_le_bytes([entry_buf[6], entry_buf[7]]);
 
                     let import_by_ordinal: ImportOrdinal = ImportOrdinal {
-                        imp_mod: module_index,
-                        imp_ord: ordinal,
+                        imp_mod_index: module_index,
+                        imp_ordinal: ordinal,
                     };
 
                     RelocationType::ImportOrdinal(import_by_ordinal)

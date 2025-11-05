@@ -43,8 +43,8 @@ pub mod resntab;
 /// +---------------------------+
 /// |        padding            |
 /// +---------------------------+
-/// | .CODE segment 1 [relocs..]| **Segments Table** of New Executable contains not just
-/// | .CODE segment 2 [relocs..]| segments data of length and positions. For each segment
+/// | .CODE segment 1           | **Segments Table** of New Executable contains not just
+/// | .CODE segment 2           | segments data of length and positions. For each segment
 /// | .DATA segment 3 []        | in table if flags byte mask contains SEG_HASRELOC (0x0100)
 /// |                   +-------+ exists following next array of relocations.
 /// +-------------------+       |
@@ -124,15 +124,17 @@ impl NeExecutableLayout {
 
         for i in 0..new_header.e_cseg {
             let seg = NeSegment::read(&mut reader, new_header.e_align)?;
+            segments.push(seg);
+        }
 
+        for (i, s) in segments.iter().enumerate() {
             imp_list.push(NeSegmentDllImportsTable::read(
                 &mut reader,
-                &seg.relocs,
+                &s.relocs,
                 dos_header.e_lfanew + (new_header.e_imp_tab as u32),
                 dos_header.e_lfanew + (new_header.e_mod_tab as u32),
                 (i + 1) as i32
-            ));
-            segments.push(seg);
+            )?);
         }
 
         let layout = NeExecutableLayout{

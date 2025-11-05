@@ -1,5 +1,8 @@
 // Unsafe undeclared types may contain here
 
+use std::fmt;
+use std::fmt::{Debug, Formatter};
+
 ///
 /// ### Pascal String
 /// Type of ASCII string mostly used in Pascal.
@@ -7,23 +10,12 @@
 ///
 /// That's main difference between it and terminated C-Strings
 /// ```pas
-/// uses
-///     decay;
-/// var
-///     str:    string;
-///     bytes:  array[0..255] of byte;
-/// {
-///     str = "pascal string" -> bytes[0] - 13
-///                              bytes[1] - 'p'
-///                              bytes[2] - 'a'
-///                              bytes[3] - 's'
-///                              ...
-///                              bytes[13] - 'g'
-/// }
-/// begin
-///     str := 'pascal string';
-///     bytes := decay.PascalStringToBytes(str);
-/// end.
+/// str = "pascal string" -> bytes[0] - 13
+///                          bytes[1] - 'p'
+///                          bytes[2] - 'a'
+///                          bytes[3] - 's'
+///                          ...
+///                          bytes[13] - 'g'
 /// ```
 ///
 #[derive(Debug, Clone)]
@@ -31,7 +23,6 @@ pub(crate) struct PascalString {
     length: u8,
     string: Vec<u8>,
 }
-
 impl PascalString {
     pub fn empty() -> Self {
         PascalString {
@@ -52,3 +43,9 @@ impl PascalString {
         self.string.as_slice()
     }
 }
+// 
+// impl Debug for PascalString {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+//         write!(f, "{}", self.to_string())
+//     }
+// }

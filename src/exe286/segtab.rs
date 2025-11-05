@@ -1,78 +1,239 @@
 use crate::exe286::segrelocs::{RelocationTable, RelocationType};
 use crate::types::PascalString;
 use std::io::{self, Read, Seek, SeekFrom};
-
 ///
 /// This table contains one 8-byte record for every code and data segment
-/// in the program or library module. 
-/// 
+/// in the program or library module.
+///
 /// Each segment has an #ordinal number
 /// associated with it. For example, the first segment has an ordinal
-/// number of 1. 
+/// number of 1.
 /// These segment numbers are used to reference the segments
-/// in other sections of the New Executable file. 
+/// in other sections of the New Executable file.
 /// (Offsets are from the beginning of the record.)
-/// 
+///
 #[derive(Debug, Clone)]
 pub struct NeSegment {
     pub header: NeSegmentHeader,
     pub shift_count: u16,
     pub data: Option<Vec<u8>>,
-    pub relocs: RelocationTable
+    pub relocs: RelocationTable,
 }
 
 impl NeSegment {
-    /// Reads the record in segments table
-    /// without raw segment data.
-    pub fn read<TRead: Read + Seek>(r: &mut TRead, shift_count: u16) -> io::Result<Self> {
-        let align = match shift_count {
-            0 => 9,
-            _ => shift_count
+    pub fn read<T: Read + Seek>(reader: &mut T, alignment: u16) -> io::Result<Self> {
+        let alignment = if alignment == 0 { 9 } else { alignment };
+        let header = NeSegmentHeader::read(reader)?;
+
+        let relocs = if !header.relocations_stripped() {
+            Self::read_relocs(reader, alignment.into(), &header)?
+        } else {
+            RelocationTable { rel_entries: vec![] }
         };
-
-        let header = NeSegmentHeader::read(r)?;
-        let mut relocs = RelocationTable { rel_entries: vec![] };
-
-        if !header.relocations_stripped() {
-            relocs = Self::read_relocs(r, align as u64, &header)?
-        }
 
         Ok(Self {
             header,
-            shift_count: align,
+            shift_count: alignment,
             data: None,
-            relocs
+            relocs,
         })
     }
-    fn read_relocs<TRead: Read + Seek>(r: &mut TRead, a: u64, h: &NeSegmentHeader) -> io::Result<RelocationTable> {
 
-        let position: u64 = (h.sector_base * (1 << a) + h.sector_length) as u64;
+    fn read_relocs<T: Read + Seek>(
+        reader: &mut T,
+        alignment: u64,
+        header: &NeSegmentHeader
+    ) -> io::Result<RelocationTable> {
+        let position = match (header.sector_base as u64).checked_mul(1 << alignment) {
+            Some(base_shifted) => base_shifted.checked_add(header.sector_length as u64),
+            None => None,
+        };
 
-        let current_pos = r.stream_position()?;
-        let file_len = r.seek(SeekFrom::End(0))?;
-        r.seek(SeekFrom::Start(current_pos))?;
+        let position = match position {
+            Some(pos) => pos,
+            None => return Ok(RelocationTable { rel_entries: vec![] }),
+        };
 
-        if position + 2 > file_len {
+        let current_pos = reader.stream_position()?;
+        let file_length = reader.seek(SeekFrom::End(0))?;
+        reader.seek(SeekFrom::Start(current_pos))?;
+
+        if position + 2 > file_length {
             return Ok(RelocationTable { rel_entries: vec![] });
         }
 
-        r.seek(SeekFrom::Start(position))?;
-        RelocationTable::read(r)
+        reader.seek(SeekFrom::Start(position))?;
+        RelocationTable::read(reader)
     }
-    /// Reads the segment data uses header information.
-    pub fn read_data<TSeek: Read + Seek>(&mut self, r: &mut TSeek) -> io::Result<()> {
+
+    pub fn read_data<T: Read + Seek>(&mut self, reader: &mut T) -> io::Result<()> {
         if self.header.sector_base == 0 {
             return Ok(());
         }
-        let data_offset = self.header.data_offset(self.shift_count as u64);
+
+        let data_offset = self.header.data_offset(self.shift_count.into());
         let data_length = self.header.data_length();
 
-        r.seek(SeekFrom::Start(data_offset))?;
+        reader.seek(SeekFrom::Start(data_offset))?;
         let mut data = vec![0; data_length as usize];
-        r.read_exact(&mut data)?;
+        reader.read_exact(&mut data)?;
         self.data = Some(data);
-        
+
         Ok(())
+    }
+}
+
+// Более идиоматичная реализация для DllImport
+impl DllImport {
+    pub fn new(dll_name: PascalString, name: PascalString, ordinal: u16, file_pointer: u64) -> Self {
+        Self {
+            dll_name,
+            name,
+            ordinal,
+            file_pointer,
+        }
+    }
+}
+
+/// ### Imports extraction from segmented module
+/// Read [it](https://alexeytolstopyatov.github.io/notes/2025/09/23/ne-imptab.html) please
+/// if you really need to know how to define dynamic imports
+pub struct NeSegmentDllImportsTable {
+    pub seg_number: i32,
+    pub imp_list: Vec<DllImport>,
+}
+impl NeSegmentDllImportsTable {
+    pub fn read<T: Read + Seek>(
+        reader: &mut T,
+        relocs: &RelocationTable,
+        imp_tab: u32,
+        mod_tab: u32,
+        seg_number: i32,
+    ) -> io::Result<Self> {
+        let mut imp_list = Vec::new();
+
+        for reloc in &relocs.rel_entries {
+            match &reloc.rel_type {
+                RelocationType::ImportName(import_name) => {
+                    if let Some(import) = Self::read_import_name(
+                        reader, import_name, imp_tab, mod_tab
+                    )? {
+                        imp_list.push(import);
+                    }
+                }
+                RelocationType::ImportOrdinal(import_ord) => {
+                    if let Some(import) = Self::read_import_ordinal(
+                        reader, import_ord, imp_tab, mod_tab
+                    )? {
+                        imp_list.push(import);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        Ok(Self {
+            seg_number,
+            imp_list,
+        })
+    }
+
+    fn read_import_name<T: Read + Seek>(
+        reader: &mut T,
+        import_name: &crate::exe286::segrelocs::ImportName,
+        imp_tab: u32,
+        mod_tab: u32,
+    ) -> io::Result<Option<DllImport>> {
+        let mod_offset = Self::read_module_offset(reader, mod_tab, import_name.imp_mod)?;
+        let mod_offset = match mod_offset {
+            Some(offset) => offset,
+            None => return Ok(None),
+        };
+
+        let dll_name = Self::read_module_name(reader, imp_tab, mod_offset)?;
+        let proc_name = Self::read_procedure_name(reader, imp_tab, import_name.imp_offset)?;
+
+        Ok(Some(DllImport::new(
+            dll_name,
+            proc_name,
+            0,
+            (imp_tab + import_name.imp_offset as u32) as u64,
+        )))
+    }
+
+    fn read_import_ordinal<T: Read + Seek>(
+        reader: &mut T,
+        import_ord: &crate::exe286::segrelocs::ImportOrdinal,
+        imp_tab: u32,
+        mod_tab: u32,
+    ) -> io::Result<Option<DllImport>> {
+        let mod_offset = Self::read_module_offset(reader, mod_tab, import_ord.imp_mod_index)?;
+        let mod_offset = match mod_offset {
+            Some(offset) => offset,
+            None => return Ok(None),
+        };
+
+        let dll_name = Self::read_module_name(reader, imp_tab, mod_offset)?;
+
+        Ok(Some(DllImport::new(
+            dll_name,
+            PascalString::empty(),
+            import_ord.imp_ordinal,
+            reader.stream_position()?,
+        )))
+    }
+
+    fn read_module_offset<T: Read + Seek>(
+        reader: &mut T,
+        mod_tab: u32,
+        imp_mod: u16,
+    ) -> io::Result<Option<u16>> {
+        let mod_offset_ptr = mod_tab + 2 * (imp_mod - 1) as u32;
+        reader.seek(SeekFrom::Start(mod_offset_ptr as u64))?;
+
+        let mut mod_offset_buf = [0; 2];
+        reader.read_exact(&mut mod_offset_buf)?;
+        let mod_offset = u16::from_le_bytes(mod_offset_buf);
+
+        Ok(if mod_offset == 0 { None } else { Some(mod_offset) })
+    }
+
+    fn read_module_name<T: Read + Seek>(
+        reader: &mut T,
+        imp_tab: u32,
+        mod_offset: u16,
+    ) -> io::Result<PascalString> {
+        let mod_ptr = imp_tab + mod_offset as u32;
+        reader.seek(SeekFrom::Start(mod_ptr as u64))?;
+
+        let mut mod_len = 0;
+        reader.read_exact(std::slice::from_mut(&mut mod_len))?;
+
+        let mut name = vec![0; mod_len as usize];
+        reader.read_exact(&mut name)?;
+
+        Ok(PascalString::new(mod_len, name))
+    }
+
+    fn read_procedure_name<T: Read + Seek>(
+        reader: &mut T,
+        imp_tab: u32,
+        imp_offset: u16,
+    ) -> io::Result<PascalString> {
+        let proc_ptr = imp_tab + imp_offset as u32;
+        reader.seek(SeekFrom::Start(proc_ptr as u64))?;
+
+        let mut proc_len = 0;
+        reader.read_exact(std::slice::from_mut(&mut proc_len))?;
+
+        if proc_len == 0 {
+            return Ok(PascalString::empty());
+        }
+
+        let mut name = vec![0; proc_len as usize];
+        reader.read_exact(&mut name)?;
+
+        Ok(PascalString::new(proc_len, name))
     }
 }
 ///
@@ -85,7 +246,7 @@ impl NeSegment {
 /// | offset | length | flags | minalloc |
 /// | 0xABCD | 0x0100 | 0x... | ...      |
 /// | 0xBOOC | 0x0020 | 0x007 | ...      |
-/// | ...    | ...    | ...   | ...      | 
+/// | ...    | ...    | ...   | ...      |
 ///      |                 |
 ///      |                 |
 ///      |                 +-----> Based on flags and SEG_HASMASK (0x0007) byte
@@ -98,7 +259,7 @@ impl NeSegment {
 /// ```
 /// Every segment has a rights to contain own relocations table,
 /// because this way to imagine the segments table is most simple.
-/// 
+///
 #[derive(Debug, Clone, Copy)]
 pub struct NeSegmentHeader {
     pub sector_base: u16,
@@ -269,127 +430,6 @@ pub struct DllImport {
     /// Exports in another modules declares the Name of entry point
     /// and positioning index in the EntryTable. This index calls by others "ordinal".
     ///
-    /// ```def
-    /// NAME        = 'hello' # I can not stand NULL terminator to the strings here.
-    ///                       # But for every string must have NULL terminator
-    /// DESCRIPTION = 'This project linked under Windows 11 and VSCode'
-    ///
-    /// STACKSIZE   = 1024
-    /// HEAPSIZE    = 4096
-    ///
-    /// EXPORTS
-    /// HelloWatcom @60  # <-- Will be placed to Non-Resident Names
-    ///                  #     as HELLOWATCOM by 60 position in EntryTable.
-    /// ```
     pub ordinal: u16,
     pub file_pointer: u64,
-}
-
-/// ### Imports extraction from segmented module
-/// Read [it](https://alexeytolstopyatov.github.io/notes/2025/09/23/ne-imptab.html) please
-/// if you really need to know how to define dynamic imports
-pub struct NeSegmentDllImportsTable {
-    pub seg_number: i32,
-    pub imp_list: Vec<DllImport>,
-}
-
-impl NeSegmentDllImportsTable {
-    pub fn read<TRead: Read + Seek>(
-        reader: &mut TRead,
-        relocs: &RelocationTable,
-        imp_tab: u32, // <-- absolute already
-        mod_tab: u32, // <-- absolute already
-        seg_number: i32) -> NeSegmentDllImportsTable {
-        let mut imports = Vec::<DllImport>::new();
-
-        for i in &relocs.rel_entries {
-            match &i.rel_type {
-                RelocationType::ImportName(n) => {
-                    let mod_offset_ptr = mod_tab + 2 * (n.imp_mod - 1) as u32;
-                    let proc_ptr = imp_tab + n.imp_offset as u32;
-
-                    reader.seek(SeekFrom::Start(mod_offset_ptr as u64)).unwrap();
-
-                    let mut mod_offset_buf = [0; 2];
-                    reader.read_exact(&mut mod_offset_buf).unwrap();
-
-                    let mod_offset: u16 = bytemuck::cast(mod_offset_buf);
-
-                    if mod_offset == 0 {
-                        continue;
-                    }
-
-                    let mod_ptr = imp_tab + mod_offset as u32;
-
-                    reader.seek(SeekFrom::Start(mod_ptr as u64)).unwrap();
-                    let mod_len = {
-                        let mut len = 0;
-                        reader.read_exact(std::slice::from_mut(&mut len)).unwrap();
-                        len
-                    };
-
-                    let mod_name = {
-                        let mut name = vec![0; mod_offset as usize];
-                        reader.read_exact(&mut name).unwrap();
-                        name
-                    };
-
-                    reader.seek(SeekFrom::Start(proc_ptr as u64)).unwrap();
-                    let proc_len = {
-                        let mut len = 0;
-                        reader.read_exact(std::slice::from_mut(&mut len)).unwrap();
-                        len
-                    };
-
-                    if proc_len == 0 {
-                        continue
-                    }
-
-                    let proc_name = {
-                        let mut name = vec![0; proc_len as usize];
-                        reader.read_exact(&mut name).unwrap();
-
-                        name
-                    };
-                    imports.push(DllImport {
-                        dll_name: PascalString::new(mod_len, mod_name),
-                        name: PascalString::new(proc_len, proc_name),
-                        ordinal: 0,
-                        file_pointer: proc_ptr as u64,
-                    });
-                }
-                RelocationType::ImportOrdinal(o) => {
-                    let mod_ptr = mod_tab + 2 * (o.imp_mod - 1) as u32;
-                    let mod_len = {
-                        let mut len = 0;
-                        reader.read_exact(std::slice::from_mut(&mut len)).expect("failed to read module string metadata");
-                        len
-                    };
-
-                    if mod_len == 0 {
-                        continue;
-                    }
-
-                    let mod_name = {
-                        let mut name = vec![0; mod_len as usize];
-                        reader.read_exact(&mut name).expect("unable to read module name");
-                        name
-                    };
-
-                    imports.push(DllImport {
-                        dll_name: PascalString::new(mod_len, mod_name),
-                        name: PascalString::empty(),
-                        ordinal: o.imp_ord,
-                        file_pointer: reader.stream_position().unwrap()
-                    });
-                }
-                _ => ()
-            }
-        }
-
-        NeSegmentDllImportsTable {
-            seg_number: 0,
-            imp_list: imports
-        }
-    }
 }

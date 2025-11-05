@@ -77,7 +77,7 @@ pub(crate) struct NeExecutableLayout {
     pub nres_tab: NonResidentNameTable,
     pub resn_tab: ResidentNameTable,
     pub mod_tab: NeModuleReferencesTable,
-    pub imp_tab: NeSegmentDllImportsTable
+    pub imp_tab: Vec<NeSegmentDllImportsTable>
 }
 
 impl NeExecutableLayout {
@@ -114,25 +114,36 @@ impl NeExecutableLayout {
         reader.seek(SeekFrom::Start((new_header.e_ent_tab as u32 + dos_header.e_lfanew)as u64))?;
         let ent_table = EntryTable::read(&mut reader, new_header.e_cb_ent)?;
 
-        reader.seek(SeekFrom::Start((new_header.e_seg_tab as u32 + dos_header.e_lfanew) as u64))?;
-        let mut sex = Vec::<NeSegment>::new();
-        for i in 0..new_header.e_cseg {
-            sex.push(NeSegment::read(&mut reader, i)?);
-        }
-        
         reader.seek(SeekFrom::Start((new_header.e_mod_tab as u32 + dos_header.e_lfanew) as u64))?;
         let mod_tab = NeModuleReferencesTable::read(&mut reader, new_header.e_cmod)?;
-        
-        
-        
+
+
+        let mut imp_list = Vec::<NeSegmentDllImportsTable>::new();
+        let mut segments = Vec::<NeSegment>::new();
+        reader.seek(SeekFrom::Start((dos_header.e_lfanew + new_header.e_seg_tab as u32 ) as u64))?;
+
+        for i in 0..new_header.e_cseg {
+            let seg = NeSegment::read(&mut reader, new_header.e_align)?;
+
+            imp_list.push(NeSegmentDllImportsTable::read(
+                &mut reader,
+                &seg.relocs,
+                dos_header.e_lfanew + (new_header.e_imp_tab as u32),
+                dos_header.e_lfanew + (new_header.e_mod_tab as u32),
+                (i + 1) as i32
+            ));
+            segments.push(seg);
+        }
+
         let layout = NeExecutableLayout{
             dos_header,
             new_header,
             ent_tab: ent_table,
             nres_tab,
             resn_tab,
-            seg_tab: sex,
-            mod_tab
+            seg_tab: segments,
+            mod_tab,
+            imp_tab: imp_list
         };
 
         Ok(layout)

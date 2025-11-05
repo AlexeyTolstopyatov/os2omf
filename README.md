@@ -39,7 +39,7 @@ Segmented or "New" executables format was a Microsoft format for binaries which
 runs after Intel context swithes. Segmeted memory model what still uses in Intel 286
 protected mode is a base of programs and libraries linked by this specification.
 
-> [!INFO]
+> [!IMPORTANT]
 > This module like mostly bases on [win16ne](https://github.com/qnighy/win16ne/) by 
 > [qnighy](https://github.com/qnighy/) and my [Sunflower](https://github.com/AlexeyTolstopyatov/SunFlower.Plugins/) plugin 
 

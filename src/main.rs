@@ -9,18 +9,9 @@ mod types;
 ///  - rustc 1.88.0 (6b00bc388 2025-06-23)
 ///  - bytemuck 1.24.0
 fn main() -> std::io::Result<()> {
-    let path = "D:\\TEST\\Windows2.1\\CALC.EXE";
+    let path = "D:\\TEST\\OS2\\SYSINST2.EXE";
 
     let ne = exe286::NeExecutableLayout::get(path)?;
-
-    for i in ne.resn_tab.entries {
-        println!("{}@{}", i.name.to_string(), i.ordinal);
-    }
-
-    for i in ne.nres_tab.entries {
-        println!("{}@{}", i.name.to_string(), i.ordinal);
-    }
-    dbg!(ne.ent_tab);
 
     Ok(())
 }

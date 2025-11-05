@@ -1,6 +1,6 @@
+use crate::exe286::segrelocs::{RelocationTable, RelocationType};
+use crate::types::PascalString;
 use std::io::{self, Read, Seek, SeekFrom};
-use std::io::SeekFrom::Start;
-use crate::exe286::segrelocs::RelocationTable;
 
 ///
 /// This table contains one 8-byte record for every code and data segment
@@ -25,7 +25,7 @@ impl NeSegment {
     /// Reads the record in segments table
     /// without raw segment data.
     pub fn read<TRead: Read + Seek>(r: &mut TRead, shift_count: u16) -> io::Result<Self> {
-        let align  = match shift_count {
+        let align = match shift_count {
             0 => 9,
             _ => shift_count
         };
@@ -34,7 +34,7 @@ impl NeSegment {
         let mut relocs = RelocationTable { rel_entries: vec![] };
 
         if !header.relocations_stripped() {
-            relocs = Self::read_relocs(r, shift_count as u64, &header)?
+            relocs = Self::read_relocs(r, align as u64, &header)?
         }
 
         Ok(Self {
@@ -45,9 +45,9 @@ impl NeSegment {
         })
     }
     fn read_relocs<TRead: Read + Seek>(r: &mut TRead, a: u64, h: &NeSegmentHeader) -> io::Result<RelocationTable> {
-        let position = (h.data_offset_shifted as u64 * a) + h.data_length();
 
-        // bounds check
+        let position: u64 = (h.sector_base * (1 << a) + h.sector_length) as u64;
+
         let current_pos = r.stream_position()?;
         let file_len = r.seek(SeekFrom::End(0))?;
         r.seek(SeekFrom::Start(current_pos))?;
@@ -61,11 +61,12 @@ impl NeSegment {
     }
     /// Reads the segment data uses header information.
     pub fn read_data<TSeek: Read + Seek>(&mut self, r: &mut TSeek) -> io::Result<()> {
-        if self.header.data_offset_shifted == 0 {
+        if self.header.sector_base == 0 {
             return Ok(());
         }
         let data_offset = self.header.data_offset(self.shift_count as u64);
         let data_length = self.header.data_length();
+
         r.seek(SeekFrom::Start(data_offset))?;
         let mut data = vec![0; data_length as usize];
         r.read_exact(&mut data)?;
@@ -100,8 +101,8 @@ impl NeSegment {
 /// 
 #[derive(Debug, Clone, Copy)]
 pub struct NeSegmentHeader {
-    pub data_offset_shifted: u16,
-    pub data_length: u16,
+    pub sector_base: u16,
+    pub sector_length: u16,
     pub flags: u16,
     pub min_alloc: u16,
 }
@@ -176,8 +177,8 @@ impl NeSegmentHeader {
             .unwrap());
 
         Ok(Self {
-            data_offset_shifted: get_u16(0),
-            data_length: get_u16(2),
+            sector_base: get_u16(0),
+            sector_length: get_u16(2),
             flags: get_u16(4),
             min_alloc: get_u16(6),
         })
@@ -187,7 +188,7 @@ impl NeSegmentHeader {
     /// segment rights.
     ///
     pub fn get_segment_rights(&self) -> NeSegmentRights {
-        if self.data_offset_shifted == 0_u16 {
+        if self.sector_base == 0 {
             return NeSegmentRights::BSS;
         }
 
@@ -208,14 +209,14 @@ impl NeSegmentHeader {
     /// depend hard on sector shifting
     ///
     pub fn data_offset(&self, alignment: u64) -> u64 {
-        (self.data_offset_shifted as u64) << alignment
+        (self.sector_base as u64) << alignment
     }
 
     pub fn data_length(&self) -> u64 {
-        if self.data_length == 0 {
+        if self.sector_length == 0 {
             0x10000
         } else {
-            self.data_length as u64
+            self.sector_length as u64
         }
     }
 
@@ -232,6 +233,7 @@ impl NeSegmentHeader {
 }
 
 /// > This scheme is custom!
+///
 /// It's not include in official documentation.
 pub struct DllImport {
     /// ### Module's Name
@@ -253,13 +255,13 @@ pub struct DllImport {
     ///
     /// You can rename KERNEL.EXE to KERNEL.DLL or something else, but system's loader
     /// looks up at the @0 ordinal **if module defined** _and_ **required to be loaded**
-    pub dll_name: String,
+    pub dll_name: PascalString,
     ///
     /// ### Procedure's Name
     ///
     /// If you want to know more about it: pls read [it](https://alexeytolstopyatov.github.io/notes/2025/09/23/ne-imptab.html)
     /// I've described all problems and base of it there.
-    pub name: String,
+    pub name: PascalString,
     /// ### Procedure's Ordinal
     /// Uses instead name if entry point is unnamed or
     /// specially hidden by linker in special project file ".def"
@@ -287,5 +289,107 @@ pub struct DllImport {
 /// Read [it](https://alexeytolstopyatov.github.io/notes/2025/09/23/ne-imptab.html) please
 /// if you really need to know how to define dynamic imports
 pub struct NeSegmentDllImportsTable {
+    pub seg_number: i32,
     pub imp_list: Vec<DllImport>,
+}
+
+impl NeSegmentDllImportsTable {
+    pub fn read<TRead: Read + Seek>(
+        reader: &mut TRead,
+        relocs: &RelocationTable,
+        imp_tab: u32, // <-- absolute already
+        mod_tab: u32, // <-- absolute already
+        seg_number: i32) -> NeSegmentDllImportsTable {
+        let mut imports = Vec::<DllImport>::new();
+
+        for i in &relocs.rel_entries {
+            match &i.rel_type {
+                RelocationType::ImportName(n) => {
+                    let mod_offset_ptr = mod_tab + 2 * (n.imp_mod - 1) as u32;
+                    let proc_ptr = imp_tab + n.imp_offset as u32;
+
+                    reader.seek(SeekFrom::Start(mod_offset_ptr as u64)).unwrap();
+
+                    let mut mod_offset_buf = [0; 2];
+                    reader.read_exact(&mut mod_offset_buf).unwrap();
+
+                    let mod_offset: u16 = bytemuck::cast(mod_offset_buf);
+
+                    if mod_offset == 0 {
+                        continue;
+                    }
+
+                    let mod_ptr = imp_tab + mod_offset as u32;
+
+                    reader.seek(SeekFrom::Start(mod_ptr as u64)).unwrap();
+                    let mod_len = {
+                        let mut len = 0;
+                        reader.read_exact(std::slice::from_mut(&mut len)).unwrap();
+                        len
+                    };
+
+                    let mod_name = {
+                        let mut name = vec![0; mod_offset as usize];
+                        reader.read_exact(&mut name).unwrap();
+                        name
+                    };
+
+                    reader.seek(SeekFrom::Start(proc_ptr as u64)).unwrap();
+                    let proc_len = {
+                        let mut len = 0;
+                        reader.read_exact(std::slice::from_mut(&mut len)).unwrap();
+                        len
+                    };
+
+                    if proc_len == 0 {
+                        continue
+                    }
+
+                    let proc_name = {
+                        let mut name = vec![0; proc_len as usize];
+                        reader.read_exact(&mut name).unwrap();
+
+                        name
+                    };
+                    imports.push(DllImport {
+                        dll_name: PascalString::new(mod_len, mod_name),
+                        name: PascalString::new(proc_len, proc_name),
+                        ordinal: 0,
+                        file_pointer: proc_ptr as u64,
+                    });
+                }
+                RelocationType::ImportOrdinal(o) => {
+                    let mod_ptr = mod_tab + 2 * (o.imp_mod - 1) as u32;
+                    let mod_len = {
+                        let mut len = 0;
+                        reader.read_exact(std::slice::from_mut(&mut len)).expect("failed to read module string metadata");
+                        len
+                    };
+
+                    if mod_len == 0 {
+                        continue;
+                    }
+
+                    let mod_name = {
+                        let mut name = vec![0; mod_len as usize];
+                        reader.read_exact(&mut name).expect("unable to read module name");
+                        name
+                    };
+
+                    imports.push(DllImport {
+                        dll_name: PascalString::new(mod_len, mod_name),
+                        name: PascalString::empty(),
+                        ordinal: o.imp_ord,
+                        file_pointer: reader.stream_position().unwrap()
+                    });
+                }
+                _ => ()
+            }
+        }
+
+        NeSegmentDllImportsTable {
+            seg_number: 0,
+            imp_list: imports
+        }
+    }
 }

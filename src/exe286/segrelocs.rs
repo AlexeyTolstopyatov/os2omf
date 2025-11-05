@@ -93,7 +93,7 @@ impl RelocationTable {
     pub fn read<TRead: Read>(r: &mut TRead) -> io::Result<Self> {
         let mut count_buf = [0; 2];
         r.read_exact(&mut count_buf)?;
-        let count = u16::from_le_bytes(count_buf);
+        let count: u16 = bytemuck::cast(count_buf);
 
         let mut entries = Vec::with_capacity(count as usize);
 

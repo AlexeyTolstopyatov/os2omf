@@ -1,5 +1,6 @@
 use bytemuck::{Pod, Zeroable};
 use std::io::{Error, ErrorKind, Read};
+use crate::TargetObject;
 
 pub const LX_MAGIC: u16 = 0x584c;
 pub const LX_CIGAM: u16 = 0x4c58;
@@ -85,11 +86,20 @@ impl LinearExecutableHeader {
     pub fn read<T: Read>(r: &mut T) -> Result<LinearExecutableHeader, Error> {
         let mut buf = [0; 184]; // 184+12 = 200
         r.read_exact(&mut buf)?;
-        
-        let header = bytemuck::try_from_bytes(&buf)
-            .map_err(|e| Error::new(ErrorKind::InvalidData, "Unable to cast bytes into header"))?;
+
+        let header: &LinearExecutableHeader = bytemuck::try_from_bytes(&buf)
+            .map_err(|_| Error::new(ErrorKind::InvalidData, "Unable to cast bytes into header"))?;
         
         Ok(*header)
+    }
+    pub fn who_is_it(&self) -> TargetObject {
+        match self.e32_magic { 
+            LE_CIGAM => TargetObject::LEModule,
+            LE_MAGIC => TargetObject::LEModule,
+            LX_MAGIC => TargetObject::LXModule,
+            LX_CIGAM => TargetObject::LXModule,
+            _ => TargetObject::MZModule
+        }
     }
 }
 #[repr(u16)]
@@ -100,8 +110,8 @@ pub enum CPU {
 }
 pub enum OS {
     Unknown = 0,
-    Os2 = 0x0001,
-    Windows = 0x0002,
+    Os2v2 = 0x0001,
+    Windows286 = 0x0002,
     Dos4 = 0x0003,
     Windows386 = 0x0004,
     PersonalityNeural = 0x0005,
@@ -157,7 +167,7 @@ impl LinearExecutableFlags {
     /// the file data will be applied
     /// 
     /// In practice if internal relocations stripped -- module still
-    /// having fixup records table. But doesn't contain internal fixups.
+    /// has fixup records table. But doesn't contain internal fixups.
     /// 
     pub fn internal_relocs_stripped(&self) -> bool {
         self.flags & 0x00000010 != 0
@@ -176,6 +186,15 @@ impl LinearExecutableFlags {
             return LinearExecutableType::DLD;
         }
         LinearExecutableType::EXE
+    }
+    ///
+    /// Be carefully: Only LE-ordered files are supported!
+    /// 
+    pub fn le_byte_ordering(&self) -> bool {
+        if self.bo == 0 && self.wo == 0 {
+            return true;
+        }
+        false
     }
 }
 //

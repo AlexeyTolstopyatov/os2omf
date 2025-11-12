@@ -72,7 +72,7 @@ pub enum Entry {
 }
 
 impl EntryTable {
-    pub fn new<T: Read>(reader: &mut T) -> io::Result<Self> {
+    pub fn read<T: Read>(reader: &mut T) -> io::Result<Self> {
         let mut bundles = Vec::new();
 
         loop {

@@ -1,7 +1,6 @@
 // Unsafe undeclared types may contain here
 
 mod readable;
-
 use std::fmt::Debug;
 
 ///

@@ -1,5 +1,4 @@
-use std::io::{self, Read, Error, ErrorKind, Seek};
-use crate::exe386::header::LinearExecutableHeader;
+use std::io::{self, Error, ErrorKind, Read, Seek};
 
 #[derive(Debug, Clone)]
 pub struct FixupRecord {
@@ -74,19 +73,18 @@ pub struct FixupRecordsTable {
 }
 
 impl FixupRecordsTable {
-    pub fn read_fixup_records_table<R: Read + Seek>(
+    pub fn read<R: Read + Seek>(
         reader: &mut R,
-        header: &LinearExecutableHeader,
-        e_lfanew: u64,
+        imp_mod: u32,
+        fpagetab: u32,
+        fixupsize: u32
     ) -> io::Result<Self> {
-        let frectab_offset = header.e32_frectab as u64 + e_lfanew;
-        let mut records = Vec::new();
+        //let frectab_offset = header.e32_frectab as u64 + e_lfanew;
+        let mut records = Vec::<FixupRecord>::new();
 
-        let max_records = reader
-            .bytes()
-            .count();
+        let max_records = if imp_mod == 0 { fixupsize + fpagetab } else { imp_mod };
 
-        for _ in 0..max_records {
+        while reader.stream_position()? < max_records as u64 {
             match Self::read_single_fixup_record(reader) {
                 Ok(Some(record)) => records.push(record),
                 Ok(None) => break, // <-- end of fixup records table
@@ -100,9 +98,9 @@ impl FixupRecordsTable {
 
     fn read_single_fixup_record<R: Read>(reader: &mut R) -> io::Result<Option<FixupRecord>> {
         let mut source_buf = [0_u8];
-        if reader.read(&mut source_buf)? == 0 {
-            return Ok(None);
-        }
+
+        reader.read_exact(&mut source_buf)?;
+
         let source = source_buf[0];
 
         let mut target_flags_buf = [0_u8];

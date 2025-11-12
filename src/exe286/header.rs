@@ -82,4 +82,11 @@ impl NeHeader {
             _ => false
         }
     }
+    pub(crate) fn get_flags(&self) -> Vec<String> {
+        let mut flags = Vec::new();
+
+
+
+        flags
+    }
 }

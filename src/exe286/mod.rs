@@ -1,14 +1,15 @@
-use std::fs::File;
-use std::io;
-use std::io::{BufReader, Read, Seek, SeekFrom};
-use crate::exe286::enttab::{Entry, EntryTable};
+use crate::exe::MzHeader;
+use crate::exe286::enttab::EntryTable;
 use crate::exe286::header::NeHeader;
 use crate::exe286::modtab::NeModuleReferencesTable;
 use crate::exe286::nrestab::NonResidentNameTable;
-use crate::exe286::resntab::{ResidentNameEntry, ResidentNameTable};
-use crate::exe286::segrelocs::RelocationTable;
+use crate::exe286::resntab::ResidentNameTable;
 use crate::exe286::segtab::{NeSegment, NeSegmentDllImportsTable};
-use crate::exe::MzHeader;
+use std::fs::File;
+use std::io;
+use std::io::BufReader;
+use std::io::Seek;
+use std::io::SeekFrom;
 
 pub const NE_MAGIC: u16 = 0x454e;
 pub const NE_CIGAM: u16 = 0x4e45;

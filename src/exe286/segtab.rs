@@ -398,7 +398,7 @@ impl NeSegmentHeader {
 /// It's not include in official documentation.
 pub struct DllImport {
     /// ### Module's Name
-    /// Module's name after linker distorts and becomes `PASCALUPPERCASE`
+    /// Module's name after linker distorts and becomes `INVALIDCASE`
     /// Historically, Microsoft and IBM use `PascalCase` naming for procedures
     /// and for functions written in C/++ modules. This rule figures out everywhere
     /// but Microsoft LINK.EXE corrupts it.
@@ -407,15 +407,6 @@ pub struct DllImport {
     /// Microsoft official manual for "Segmented Executables" module names implicitly
     /// casts to a `@0` record in `ResidentNames` table. That's main reason why `@0`
     /// ordinal is a reserved value.
-    ///
-    /// ```
-    /// KERNEL.EXE may contain "KERNEL" pascal string in resident names table
-    ///            by @0 ordinal. And this is a module name exactly.
-    ///
-    /// ```
-    ///
-    /// You can rename KERNEL.EXE to KERNEL.DLL or something else, but system's loader
-    /// looks up at the @0 ordinal **if module defined** _and_ **required to be loaded**
     pub dll_name: PascalString,
     ///
     /// ### Procedure's Name

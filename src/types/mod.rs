@@ -1,7 +1,8 @@
 // Unsafe undeclared types may contain here
 
-use std::fmt;
-use std::fmt::{Debug, Formatter};
+mod readable;
+
+use std::fmt::Debug;
 
 ///
 /// ### Pascal String
@@ -43,7 +44,7 @@ impl PascalString {
         self.string.as_slice()
     }
 }
-// 
+//
 // impl Debug for PascalString {
 //     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 //         write!(f, "{}", self.to_string())

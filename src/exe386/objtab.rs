@@ -67,7 +67,7 @@ pub struct ObjectsTable {
     pub objects: Vec<Object>,
 }
 impl ObjectsTable {
-    pub fn new<T: Read>(r: &mut T, count: usize) -> Result<ObjectsTable, Error> {
+    pub fn read<T: Read>(r: &mut T, count: u32) -> Result<ObjectsTable, Error> {
         let mut objects = Vec::<Object>::new();
 
         for _ in 0..count {

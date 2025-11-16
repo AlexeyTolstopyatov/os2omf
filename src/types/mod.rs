@@ -1,7 +1,15 @@
 // Unsafe undeclared types may contain here
 
-mod readable;
-use std::fmt::Debug;
+mod procedure;
+
+use std::fmt;
+use std::fmt::{Debug, Formatter};
+
+// impl Debug for PascalString {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+//         f.write_str(self.to_string().as_str())
+//     }
+// }
 
 ///
 /// ### Pascal String
@@ -9,13 +17,13 @@ use std::fmt::Debug;
 /// Pascal string always has first byte with all string length.
 ///
 /// That's main difference between it and terminated C-Strings
-/// ```pas
-/// str = "pascal string" -> bytes[0] - 13
-///                          bytes[1] - 'p'
-///                          bytes[2] - 'a'
-///                          bytes[3] - 's'
-///                          ...
-///                          bytes[13] - 'g'
+/// ```
+/// "pascal string" -> bytes[0] - 13
+///                    bytes[1] - 'p'
+///                    bytes[2] - 'a'
+///                    bytes[3] - 's'
+///                    ...
+///                    bytes[13] - 'g'
 /// ```
 ///
 #[derive(Debug, Clone)]
@@ -43,9 +51,3 @@ impl PascalString {
         self.string.as_slice()
     }
 }
-//
-// impl Debug for PascalString {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-//         write!(f, "{}", self.to_string())
-//     }
-// }

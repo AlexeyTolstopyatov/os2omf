@@ -1,3 +1,5 @@
+mod reltab;
+
 use std::{
     io::{self, Read},
     u8,

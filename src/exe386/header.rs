@@ -82,6 +82,19 @@ pub struct LinearExecutableHeader {
     pub e32_stacksize: u32,
     pub e32_res3: [u8; 8],
 }
+// Linear Compressed executable: I've seen in DOS32a extender
+// declares like this:
+// ```rust
+// pub struct LinearExecutable {
+//      e32_magic: u32,
+//      e32_objcnt: u8,
+//      e32_mflags: u8,
+//      e32_eip_num: u8,
+//      e32_esp_num: 8,
+//      e32_eip: u32,
+//      e32_esp: u32,
+// }
+// ```
 impl LinearExecutableHeader {
     pub fn read<T: Read>(r: &mut T) -> Result<LinearExecutableHeader, Error> {
         let mut buf = [0; 184]; // 184+12 = 200
@@ -144,10 +157,10 @@ impl LinearExecutableFlags {
         word_order: u8,
         fmt_lvl: u32,
         ver: u32,
-    ) -> LinearExecutableFlags {
+    ) -> Self {
         let major_ver = ver >> 16;
         let minor_ver = ver & 0xffff;
-        LinearExecutableFlags {
+        Self {
             flags,
             bo: byte_order,
             wo: word_order,

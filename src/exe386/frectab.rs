@@ -1,10 +1,11 @@
-use std::io::{self, Error, ErrorKind, Read, Seek};
+use crate::exe386::fpagetab::FixupPageTable;
+use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom};
 
 #[derive(Debug, Clone)]
 pub struct FixupRecord {
     pub source: u8,
     pub target_flags: u8,
-    pub source_offset_or_count: u16, // <-- depends on target_flags
+    pub source_offset_or_count: u16,
     pub target_data: FixupTarget,
     pub additive_value: Option<u32>,
     pub source_offset_list: Option<Vec<u16>>,
@@ -75,25 +76,34 @@ pub struct FixupRecordsTable {
 impl FixupRecordsTable {
     pub fn read<R: Read + Seek>(
         reader: &mut R,
-        imp_mod: u32,
-        fpagetab: u32,
-        fixupsize: u32
+        fixup_page_table: &FixupPageTable,
+        fixup_record_table_offset: u64,
     ) -> io::Result<Self> {
-        //let frectab_offset = header.e32_frectab as u64 + e_lfanew;
-        let mut records = Vec::<FixupRecord>::new();
+        let mut records = Vec::new();
 
-        let max_records = if imp_mod == 0 { fixupsize + fpagetab } else { imp_mod };
+        for (logical_page, &page_offset) in fixup_page_table.page_offsets.iter().enumerate() {
+            let record_offset = fixup_record_table_offset + page_offset as u64;
+            reader.seek(SeekFrom::Start(record_offset))?;
 
-        while reader.stream_position()? < max_records as u64 {
-            match Self::read_single_fixup_record(reader) {
-                Ok(Some(record)) => records.push(record),
-                Ok(None) => break, // <-- end of fixup records table
-                Err(e) if e.kind() == ErrorKind::UnexpectedEof => break,
-                Err(e) => return Err(e),
+            // I can read records till next page offset!
+            // For elsewhere it throws unexpected problems
+            
+            let next_offset = fixup_page_table.page_offsets.get(logical_page + 1)
+                .copied()
+                .unwrap_or(fixup_page_table.end_of_fixup_records);
+
+            while reader.stream_position()? < fixup_record_table_offset + next_offset as u64 {
+                if let Some(record) = Self::read_single_fixup_record(reader)? {
+                    records.push(record);
+                } else {
+                    break;
+                }
             }
         }
 
-        Ok(Self {records})
+        Ok(Self { 
+            records 
+        })
     }
 
     fn read_single_fixup_record<R: Read>(reader: &mut R) -> io::Result<Option<FixupRecord>> {

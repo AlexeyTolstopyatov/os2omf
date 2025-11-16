@@ -1,31 +1,35 @@
-use std::fmt::Debug;
 use crate::exe::{MzHeader, E_CIGAM, E_MAGIC};
 use crate::exe386::enttab::EntryTable;
+use crate::exe386::frectab::FixupRecordsTable;
 use crate::exe386::header::{LinearExecutableHeader, LX_CIGAM, LX_MAGIC};
+use crate::exe386::imptab::{ImportData, ImportRelocationsTable};
+use crate::exe386::objtab::ObjectsTable;
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read, Seek, SeekFrom};
-use crate::exe386::frectab::FixupRecordsTable;
-use crate::exe386::imptab::{ImportData, ImportRelocationsTable};
+use crate::exe386::fpagetab::FixupPageTable;
+use crate::exe386::objpagetab::{ObjectPage, ObjectPagesTable};
 
 pub mod header;
 pub mod vxd;
 pub mod objtab;
-pub mod lx_objpages;
-pub mod le_objpages;
 pub mod enttab;
 pub mod frectab;
 pub mod imptab;
+mod nrestab;
+mod resntab;
+mod objpagetab;
+mod fpagetab;
 
 pub(crate) struct LinearExecutableLayout {
     pub header: LinearExecutableHeader,
-    //pub objects: ObjectsTable,
-    //pub object_page: LXObjectPageTable,
+    pub object_table: ObjectsTable,
+    pub object_pages: ObjectPagesTable,
     pub entry_table: EntryTable,
     pub import_table: ImportRelocationsTable
 }
 
 impl LinearExecutableLayout {
-    pub fn from(path: &str) -> Result<Self, Error> {
+    pub fn read(path: &str) -> Result<Self, Error> {
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);
 
@@ -60,15 +64,23 @@ impl LinearExecutableLayout {
         if header.e32_magic != LX_CIGAM && header.e32_magic != LX_MAGIC {
             return Err(Error::new(ErrorKind::Other, "Unable to read module as linear executable"));
         }
+        reader.seek(SeekFrom::Start(__offset(header.e32_objmap)))?;
+        let object_pages = ObjectPagesTable::read(&mut reader, header.e32_mpages, header.e32_pageshift, header.e32_magic)?;
+        
+        reader.seek(SeekFrom::Start(__offset(header.e32_objtab)))?;
+        let object_table = ObjectsTable::read(&mut reader, header.e32_objcnt)?;
+        
         reader.seek(SeekFrom::Start(__offset(header.e32_enttab)))?;
         let entry_table = EntryTable::read(&mut reader)?;
+
+        reader.seek(SeekFrom::Start(__offset(header.e32_fpagetab)))?;
+        let fixup_pages = FixupPageTable::read(&mut reader, &header)?;
 
         reader.seek(SeekFrom::Start(__offset(header.e32_frectab)))?;
         let fixup_records = FixupRecordsTable::read(
             &mut reader,
-            header.e32_impmod,
-            header.e32_fpagetab,
-            header.e32_fixupsize,
+            &fixup_pages,
+            __offset(header.e32_frectab) // <-- expected relative or an absolute value?
         )?;
 
         let imports = ImportRelocationsTable::read(
@@ -82,6 +94,8 @@ impl LinearExecutableLayout {
 
         Ok(Self {
             header,
+            object_table,
+            object_pages,
             entry_table,
             import_table: imports
         })

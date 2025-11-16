@@ -18,6 +18,5 @@ pub enum TargetObject {
 fn main() -> std::io::Result<()> {
     let exec = exe386::LinearExecutableLayout::read("D:\\TEST\\ARCA\\BDCALLS.DLL")?;
 
-
     Ok(())
 }

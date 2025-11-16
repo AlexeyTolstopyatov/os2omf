@@ -6,6 +6,7 @@ use crate::exe386::imptab::{ImportData, ImportRelocationsTable};
 use crate::exe386::objtab::ObjectsTable;
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read, Seek, SeekFrom};
+use crate::exe386::dirtab::ModuleDirectivesTable;
 use crate::exe386::fpagetab::FixupPageTable;
 use crate::exe386::objpagetab::{ObjectPage, ObjectPagesTable};
 
@@ -19,26 +20,29 @@ mod nrestab;
 mod resntab;
 mod objpagetab;
 mod fpagetab;
+mod dirtab;
 
 pub(crate) struct LinearExecutableLayout {
     pub header: LinearExecutableHeader,
     pub object_table: ObjectsTable,
     pub object_pages: ObjectPagesTable,
     pub entry_table: EntryTable,
-    pub import_table: ImportRelocationsTable
+    pub fixup_page_table: FixupPageTable,
+    //pub fixup_records_table: FixupRecordsTable,
+    pub import_table: ImportRelocationsTable,
+    pub module_directives_table: ModuleDirectivesTable
 }
 
 impl LinearExecutableLayout {
     pub fn read(path: &str) -> Result<Self, Error> {
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);
-
         let mut sig_buffer = [0_u8; 2];
         reader.read_exact(&mut sig_buffer)?;
 
         let sig_bytes = u16::from_be_bytes(sig_buffer);
         let mut base_offset: u64 = 0;
-        reader.seek(SeekFrom::Start(0))?; // <-- reset position
+        reader.seek(SeekFrom::Start(0))?;
 
         // firstly check new IBM's kind of binaries:
         let mut header: LinearExecutableHeader;
@@ -83,7 +87,7 @@ impl LinearExecutableLayout {
             __offset(header.e32_frectab) // <-- expected relative or an absolute value?
         )?;
 
-        let imports = ImportRelocationsTable::read(
+        let import_table = ImportRelocationsTable::read(
             &mut reader,
             ImportData{
                 imp_mod_offset: __offset(header.e32_impmod),
@@ -92,12 +96,24 @@ impl LinearExecutableLayout {
             }
         )?;
 
+        let mut module_directives_table = ModuleDirectivesTable::empty();
+
+        if header.e32_dirtab != 0 {
+            module_directives_table = ModuleDirectivesTable::read(
+                &mut reader,
+                &header,
+                base_offset
+            )?;
+        }
+
         Ok(Self {
             header,
             object_table,
             object_pages,
             entry_table,
-            import_table: imports
+            import_table,
+            fixup_page_table: fixup_pages,
+            module_directives_table
         })
     }
 }

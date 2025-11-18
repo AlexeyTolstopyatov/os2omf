@@ -1,10 +1,10 @@
 use crate::exe::MzHeader;
 use crate::exe286::enttab::EntryTable;
-use crate::exe286::header::NeHeader;
-use crate::exe286::modtab::NeModuleReferencesTable;
+use crate::exe286::header::NewExecutableHeader;
+use crate::exe286::modtab::ModuleReferencesTable;
 use crate::exe286::nrestab::NonResidentNameTable;
 use crate::exe286::resntab::ResidentNameTable;
-use crate::exe286::segtab::{NeSegment, NeSegmentDllImportsTable};
+use crate::exe286::segtab::{Segment, ImportsTable};
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
@@ -72,13 +72,13 @@ pub mod resntab;
 /// ```
 pub(crate) struct NeExecutableLayout {
     pub dos_header: MzHeader,
-    pub new_header: NeHeader,
+    pub new_header: NewExecutableHeader,
     pub ent_tab: EntryTable,
-    pub seg_tab: Vec<NeSegment>,
+    pub seg_tab: Vec<Segment>,
     pub nres_tab: NonResidentNameTable,
     pub resn_tab: ResidentNameTable,
-    pub mod_tab: NeModuleReferencesTable,
-    pub imp_tab: Vec<NeSegmentDllImportsTable>
+    pub mod_tab: ModuleReferencesTable,
+    pub imp_tab: Vec<ImportsTable>
 }
 
 impl NeExecutableLayout {
@@ -97,7 +97,7 @@ impl NeExecutableLayout {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid e_lfanew for protected-mode executable"));
         }
 
-        let new_header = NeHeader::read(&mut reader)?;
+        let new_header = NewExecutableHeader::read(&mut reader)?;
         if  !new_header.is_valid_magic() {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid magic for protected-mode executable"));
         }
@@ -116,20 +116,20 @@ impl NeExecutableLayout {
         let ent_table = EntryTable::read(&mut reader, new_header.e_cb_ent)?;
 
         reader.seek(SeekFrom::Start((new_header.e_mod_tab as u32 + dos_header.e_lfanew) as u64))?;
-        let mod_tab = NeModuleReferencesTable::read(&mut reader, new_header.e_cmod)?;
+        let mod_tab = ModuleReferencesTable::read(&mut reader, new_header.e_cmod)?;
 
 
-        let mut imp_list = Vec::<NeSegmentDllImportsTable>::new();
-        let mut segments = Vec::<NeSegment>::new();
+        let mut imp_list = Vec::<ImportsTable>::new();
+        let mut segments = Vec::<Segment>::new();
         reader.seek(SeekFrom::Start((dos_header.e_lfanew + new_header.e_seg_tab as u32 ) as u64))?;
 
         for i in 0..new_header.e_cseg {
-            let seg = NeSegment::read(&mut reader, new_header.e_align)?;
+            let seg = Segment::read(&mut reader, new_header.e_align)?;
             segments.push(seg);
         }
 
         for (i, s) in segments.iter().enumerate() {
-            imp_list.push(NeSegmentDllImportsTable::read(
+            imp_list.push(ImportsTable::read(
                 &mut reader,
                 &s.relocs,
                 dos_header.e_lfanew + (new_header.e_imp_tab as u32),

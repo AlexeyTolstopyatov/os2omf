@@ -47,7 +47,7 @@ pub struct LinearExecutableHeader {
     pub e32_ss: u32,
     pub e32_esp: u32,
     pub e32_pagesize: u32,
-    pub e32_pageshift: u32,
+    pub e32_pageshift_or_lastpage: u32, // LX: page_shift | LE: last page size
     pub e32_fixupsize: u32,
     pub e32_fixupsum: u32,
     pub e32_ldrsize: u32,
@@ -79,7 +79,7 @@ pub struct LinearExecutableHeader {
     pub e32_instpreload: u32,
     pub e32_instdemand: u32,
     pub e32_heapsize: u32,
-    pub e32_stacksize: u32,
+    pub e32_stacksize: u32, // LX | LE: reserved.
     pub e32_res3: [u8; 8],
 }
 // Linear Compressed executable: I've seen in DOS32a extender

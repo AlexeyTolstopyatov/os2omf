@@ -1,14 +1,14 @@
 use crate::exe::{MzHeader, E_CIGAM, E_MAGIC};
+use crate::exe386::dirtab::ModuleDirectivesTable;
 use crate::exe386::enttab::EntryTable;
+use crate::exe386::fpagetab::FixupPageTable;
 use crate::exe386::frectab::FixupRecordsTable;
 use crate::exe386::header::{LinearExecutableHeader, LX_CIGAM, LX_MAGIC};
 use crate::exe386::imptab::{ImportData, ImportRelocationsTable};
+use crate::exe386::objpagetab::ObjectPagesTable;
 use crate::exe386::objtab::ObjectsTable;
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read, Seek, SeekFrom};
-use crate::exe386::dirtab::ModuleDirectivesTable;
-use crate::exe386::fpagetab::FixupPageTable;
-use crate::exe386::objpagetab::{ObjectPage, ObjectPagesTable};
 
 pub mod header;
 pub mod vxd;
@@ -69,7 +69,7 @@ impl LinearExecutableLayout {
             return Err(Error::new(ErrorKind::Other, "Unable to read module as linear executable"));
         }
         reader.seek(SeekFrom::Start(__offset(header.e32_objmap)))?;
-        let object_pages = ObjectPagesTable::read(&mut reader, header.e32_mpages, header.e32_pageshift, header.e32_magic)?;
+        let object_pages = ObjectPagesTable::read(&mut reader, header.e32_mpages, header.e32_pageshift_or_lastpage, header.e32_magic)?;
         
         reader.seek(SeekFrom::Start(__offset(header.e32_objtab)))?;
         let object_table = ObjectsTable::read(&mut reader, header.e32_objcnt)?;

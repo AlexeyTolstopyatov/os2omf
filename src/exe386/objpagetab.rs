@@ -1,8 +1,7 @@
-use std::arch::x86_64::_mm256_undefined_pd;
+use crate::exe386;
 use bytemuck::{Pod, Zeroable};
 use std::io;
-use std::io::{Error, ErrorKind, Read, Seek, SeekFrom};
-use crate::exe386;
+use std::io::{Error, Read, Seek, SeekFrom};
 #[derive(Debug)]
 pub struct ObjectPagesTable {
     pub pages: Vec<ObjectPage>

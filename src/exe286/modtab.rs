@@ -17,11 +17,11 @@ use std::io::{self, Read};
 /// 1) Select a 2nd offset (modtab[1] = 0x0004)
 /// 2) e_lfanew + e_imptab + modtab[1]
 /// 3) Read the Pascal-String
-pub struct NeModuleReferencesTable {
+pub struct ModuleReferencesTable {
     pub m_offsets: Vec<u16>
 }
 
-impl NeModuleReferencesTable {
+impl ModuleReferencesTable {
     pub fn read<TRead : Read>(r: &mut TRead, cmod: u16) -> io::Result<Self> {
         let mut references: Vec<u16> = Vec::<u16>::new();
         let mut buf: [u8; 2] = [0, 0];
@@ -31,7 +31,7 @@ impl NeModuleReferencesTable {
             references.push(bytemuck::cast(buf));
         }
 
-        Ok(NeModuleReferencesTable { 
+        Ok(ModuleReferencesTable { 
             m_offsets: references 
         })
     }

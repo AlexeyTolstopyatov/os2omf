@@ -2,8 +2,7 @@
 
 mod procedure;
 
-use std::fmt;
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
 
 // impl Debug for PascalString {
 //     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

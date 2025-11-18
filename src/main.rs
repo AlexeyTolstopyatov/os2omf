@@ -1,5 +1,3 @@
-use crate::exe286::segtab::DllImport;
-
 mod exe;
 mod exe286;
 mod exe386;

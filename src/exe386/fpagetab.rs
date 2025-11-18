@@ -27,10 +27,10 @@ impl FixupPageTable {
 
         // records = fpages + 1 (needed end marker too)
         let entry_count = header.e32_mpages as usize + 1;
-        
+
         let mut page_offsets = Vec::with_capacity(entry_count);
         for _ in 0..entry_count {
-            let mut buf = [0u8; 4];
+            let mut buf = [0_u8; 4];
             reader.read_exact(&mut buf)?;
             page_offsets.push(u32::from_le_bytes(buf));
         }

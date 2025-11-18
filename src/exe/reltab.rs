@@ -1,7 +1,32 @@
+use std::io::{Read, Seek, SeekFrom};
+use bytemuck::{Pod, Zeroable};
+use crate::exe::MzHeader;
+
+#[derive(Debug, Clone)]
 pub struct RelocationRecordsTable {
     relocations: Vec<FarPointer>
 }
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Zeroable, Pod)]
 pub struct FarPointer {
     pub segment: u16,
     pub offset: u16,
+}
+impl RelocationRecordsTable {
+    pub fn read<T: Read + Seek>(reader: &mut T, header: &MzHeader) -> Self {
+        let mut relocations = Vec::<FarPointer>::new();
+        reader.seek(SeekFrom::Start(header.e_lfarlc as u64)).unwrap();
+        
+        if header.e_crlc != 0 {
+            for _ in 0..header.e_crlc {
+                let mut far_buff = [0_u8; 4];
+                reader.read_exact(&mut far_buff).unwrap();
+                relocations.push(bytemuck::pod_read_unaligned(&far_buff))
+            }
+        }
+        
+        Self {
+            relocations
+        }
+    }
 }

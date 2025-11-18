@@ -1,3 +1,4 @@
+
 use crate::exe286::segrelocs::{RelocationTable, RelocationType};
 use crate::types::PascalString;
 use std::io::{self, Read, Seek, SeekFrom};
@@ -13,17 +14,21 @@ use std::io::{self, Read, Seek, SeekFrom};
 /// (Offsets are from the beginning of the record.)
 ///
 #[derive(Debug, Clone)]
-pub struct NeSegment {
-    pub header: NeSegmentHeader,
+pub struct Segment {
+    pub header: SegmentHeader,
     pub shift_count: u16,
     pub data: Option<Vec<u8>>,
     pub relocs: RelocationTable,
 }
 
-impl NeSegment {
+impl Segment {
     pub fn read<T: Read + Seek>(reader: &mut T, alignment: u16) -> io::Result<Self> {
-        let alignment = if alignment == 0 { 9 } else { alignment };
-        let header = NeSegmentHeader::read(reader)?;
+        let alignment = if alignment == 0 { 
+            9 
+        } else { 
+            alignment
+        };
+        let header = SegmentHeader::read(reader)?;
 
         let relocs = if !header.relocations_stripped() {
             Self::read_relocs(reader, alignment.into(), &header)?
@@ -42,7 +47,7 @@ impl NeSegment {
     fn read_relocs<T: Read + Seek>(
         reader: &mut T,
         alignment: u64,
-        header: &NeSegmentHeader
+        header: &SegmentHeader
     ) -> io::Result<RelocationTable> {
         let position = match (header.sector_base as u64).checked_mul(1 << alignment) {
             Some(base_shifted) => base_shifted.checked_add(header.sector_length as u64),
@@ -98,11 +103,11 @@ impl DllImport {
 /// ### Imports extraction from segmented module
 /// Read [it](https://alexeytolstopyatov.github.io/notes/2025/09/23/ne-imptab.html) please
 /// if you really need to know how to define dynamic imports
-pub struct NeSegmentDllImportsTable {
+pub struct ImportsTable {
     pub seg_number: i32,
     pub imp_list: Vec<DllImport>,
 }
-impl NeSegmentDllImportsTable {
+impl ImportsTable {
     pub fn read<T: Read + Seek>(
         reader: &mut T,
         relocs: &RelocationTable,
@@ -261,7 +266,7 @@ impl NeSegmentDllImportsTable {
 /// because this way to imagine the segments table is most simple.
 ///
 #[derive(Debug, Clone, Copy)]
-pub struct NeSegmentHeader {
+pub struct SegmentHeader {
     pub sector_base: u16,
     pub sector_length: u16,
     pub flags: u16,
@@ -325,7 +330,7 @@ const SEG_RELOCS:  u16 = 0x0100;
 ///
 const SEG_DISCARD: u16 = 0xF000;
 
-impl NeSegmentHeader {
+impl SegmentHeader {
     ///
     /// Reads only one segment and fills unsafe unaligned structure
     /// of one segment header

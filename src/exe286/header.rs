@@ -8,7 +8,7 @@ use crate::exe286;
 /// 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
 #[repr(C)]
-pub struct NeHeader {
+pub struct NewExecutableHeader {
     pub e_magic: [u8; 2],
     pub e_link_maj: u8,
     pub e_link_min: u8,
@@ -62,14 +62,14 @@ impl CPU {
 ///
 /// Interface of New Executable header
 /// 
-impl NeHeader {
+impl NewExecutableHeader {
     pub fn read<TRead: Read>(r: &mut TRead) -> io::Result<Self> {
         let mut buf = [0; 0x40];
         r.read_exact(&mut buf)?;
 
         Ok(bytemuck::cast(buf))
     }
-    /// Returns the check magic of [`NeHeader`].
+    /// Returns the check magic of [`NewExecutableHeader`].
     /// 
     /// # Errors
     /// This function will return an error if header contains
@@ -84,9 +84,6 @@ impl NeHeader {
     }
     pub(crate) fn get_flags(&self) -> Vec<String> {
         let mut flags = Vec::new();
-
-
-
         flags
     }
 }

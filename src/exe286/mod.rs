@@ -28,46 +28,49 @@ pub mod resntab;
 /// Main regions of this book is a segments like sections in PE32/+ or ELF32/64 files
 /// 
 /// ```
-/// +--------+--------+---------+
-/// | MZ |...|e_lfarlc|e_lfanew ------+
-/// +--------+----|---+---------+     |
+/// +----+---+--------+---------+
+/// | MZ |   |e_lfarlc|e_lfanew ------+
+/// +----+---+----|---+---------+     |
 /// |             | always eq.  |     | **Absolute offset** what holds in e_lfanew
 /// |             | 0x40 (64)   |     | is an raw file pointer to next structure
-/// |[      ]<----+             |     | 
+/// |[      ]<----+             |     |
 /// |                           |     | That's why it calls e_lfanew.
 /// |                     +-----+     | "long file address (of) new executable"
-/// |                     | NE  <-----+
-/// +---+---+---+---+-----+-----+
-/// |lnk|lnk|...|...| ... |     | 
-/// +---+---+---+---+-----+-----+
-/// | other fields  | winver[2] |
-/// +---------------------------+
+/// |                     | NE  <-----+ <--+
+/// +---+---+---+---+---+---+---+          | New Executable Header.
+/// |   |   |   |   |   |   |   |          | Main parameter here is raw position
+/// +---+---+---+---+---+---+---+          | of new executable header.
+/// |   |   |   |   |   |   |   |          | All pointers in here are relative.
+/// +---------------------------+<---------+
 /// |        padding            |
 /// +---------------------------+
-/// | .CODE segment 1           | **Segments Table** of New Executable contains not just
-/// | .CODE segment 2           | segments data of length and positions. For each segment
-/// | .DATA segment 3 []        | in table if flags byte mask contains SEG_HASRELOC (0x0100)
-/// |                   +-------+ exists following next array of relocations.
-/// +-------------------+       |
+/// |                           | **Segments Table** of New Executable contains not just
+/// |      SEGMENTS TABLE       | segments data of length and positions. For each segment
+/// |                           | in table if flags byte mask contains SEG_HASRELOC (0x0100)
+/// |---------------------------+ exists following next array of relocations.
 /// |        padding            |
 /// +---------------------------+
-/// | 01 | 06 | 11 | 78 | 20 |  | **Module References Table**
+/// |  MODULE REFERENCES TABLE  | Pointers (indexes) of import .DLL/EXE Strings
 /// +----+----+-------+----+----+
-/// | 00 | 03 | "GDI" | 03 | MSG| **Importing modules** strings
-/// +----+----+-------+----+----+ 
-/// | 09 | FATALEXIT  |         | **Resident names** (private exports)
-/// +---------------------------+    | or exports used by module in runtime
-/// | 08 | ABOUT_RC | @1 | ...  | <--+
-/// |----+----------+----+------+ 
-/// | #1 | E_SHARED | E...      | <-- EntryPoints Table
-/// | [... ... ...] | #2 E_UNUSED     Main table for all exports in module  
-/// | [... ...] | ... +---------|     holds positions and to every entry
+/// | 00 | IMPORT MODULES TABLE | **Importing modules** strings
+/// +----+----+-------+----+----+
+/// |   RESIDENT NAMES TABLE    | Exporting functions which kept in memory
+/// +---------------------------+ while module loaded
+/// |                           |
+/// |      RESOURCES TABLE      |
+/// |                           |
+/// |---------------------------+
+/// |                           | <-- EntryPoints Table
+/// |       ENTRY TABLE         |     Main table for all exports in module
+/// |                 +---------|     holds positions and to every entry
 /// +-----------------+         |     in all registered segments in file.
-/// |  Segments and paddings    | 
-/// | raw data and x86 are here |  
+/// |                           |
+/// |       DATA AND CODE       |
+/// |  (with paddings between)  |
+/// |                           |
 /// +---------------------------+
-/// | 11 | HELLO_WATCOM  | @2   | Just **Non-Resident names** (public exports)
-/// +---------------------------+ or unused by module exports
+/// |  NONRESIDENT NAMES TABLE  | Exporting functions which unused by module
+/// +---------------------------+
 /// 
 /// ```
 pub(crate) struct NeExecutableLayout {
@@ -78,52 +81,66 @@ pub(crate) struct NeExecutableLayout {
     pub nres_tab: NonResidentNameTable,
     pub resn_tab: ResidentNameTable,
     pub mod_tab: ModuleReferencesTable,
-    pub imp_tab: Vec<ImportsTable>
+    pub imp_tab: Vec<ImportsTable>,
+
+    e_lfanew: u32,
 }
 
 impl NeExecutableLayout {
+    fn offset(&self, ptr: u16) -> u64 {
+        ptr as u64 + self.e_lfanew as u64
+    }
+
     pub fn get(path: &str) -> io::Result<Self> {
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);
 
         let dos_header = MzHeader::read(&mut reader)?;
         if !dos_header.has_valid_magic() {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid magic for dos_header"));
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid magic for dos_header"));
         }
 
         reader.seek(SeekFrom::Start(dos_header.e_lfanew as u64))?;
 
         if dos_header.e_lfanew == 0_u32 {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid e_lfanew for protected-mode executable"));
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid e_lfanew for protected-mode executable"));
         }
 
-        let new_header = NewExecutableHeader::read(&mut reader)?;
+        let offset = |ptr: u16| {
+            ptr as u64 + dos_header.e_lfanew as u64
+        };
+
+        let new_header = NewExecutableHeader::read(&mut reader, dos_header.e_lfanew)?;
         if  !new_header.is_valid_magic() {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid magic for protected-mode executable"));
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid magic for protected-mode executable"));
         }
-
         // Now we are extremely needed the e_lfanew just because
         // all pointers in Windows-OS/2 header are relative.
         // This is a chance to little compress data to NEAR pointers
-
-        reader.seek(SeekFrom::Start(new_header.e_nres_tab as u64))?;
-        let nres_tab = NonResidentNameTable::read(&mut reader)?;
-
-        reader.seek(SeekFrom::Start((new_header.e_resn_tab as u32 + dos_header.e_lfanew) as u64))?;
-        let resn_tab = ResidentNameTable::read(&mut reader)?;
-
-        reader.seek(SeekFrom::Start((new_header.e_ent_tab as u32 + dos_header.e_lfanew)as u64))?;
-        let ent_table = EntryTable::read(&mut reader, new_header.e_cb_ent)?;
-
-        reader.seek(SeekFrom::Start((new_header.e_mod_tab as u32 + dos_header.e_lfanew) as u64))?;
-        let mod_tab = ModuleReferencesTable::read(&mut reader, new_header.e_cmod)?;
-
-
+        let nres_tab = NonResidentNameTable::read(
+            &mut reader,
+            new_header.e_nres_tab
+        )?;
+        let resn_tab = ResidentNameTable::read(
+            &mut reader,
+            offset(new_header.e_resn_tab)
+        )?;
+        let ent_table = EntryTable::read(
+            &mut reader,
+            offset(new_header.e_ent_tab),
+            new_header.e_cb_ent
+        )?;
+        let mod_tab = ModuleReferencesTable::read(
+            &mut reader,
+            offset(new_header.e_mod_tab),
+            new_header.e_cmod
+        )?;
         let mut imp_list = Vec::<ImportsTable>::new();
         let mut segments = Vec::<Segment>::new();
-        reader.seek(SeekFrom::Start((dos_header.e_lfanew + new_header.e_seg_tab as u32 ) as u64))?;
 
-        for i in 0..new_header.e_cseg {
+        reader.seek(SeekFrom::Start(offset(new_header.e_seg_tab)))?;
+
+        for _ in 0..new_header.e_cseg {
             let seg = Segment::read(&mut reader, new_header.e_align)?;
             segments.push(seg);
         }
@@ -132,13 +149,13 @@ impl NeExecutableLayout {
             imp_list.push(ImportsTable::read(
                 &mut reader,
                 &s.relocs,
-                dos_header.e_lfanew + (new_header.e_imp_tab as u32),
-                dos_header.e_lfanew + (new_header.e_mod_tab as u32),
+                offset(new_header.e_imp_tab) as u32,
+                offset(new_header.e_mod_tab) as u32,
                 (i + 1) as i32
             )?);
         }
 
-        let layout = NeExecutableLayout{
+        let layout = Self {
             dos_header,
             new_header,
             ent_tab: ent_table,
@@ -146,7 +163,9 @@ impl NeExecutableLayout {
             resn_tab,
             seg_tab: segments,
             mod_tab,
-            imp_tab: imp_list
+            imp_tab: imp_list,
+
+            e_lfanew: dos_header.e_lfanew,
         };
 
         Ok(layout)

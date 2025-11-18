@@ -1,5 +1,6 @@
 // Non-Resident names table. (look at the header specs)
-use std::io::{self, Read};
+use std::io::{self, Read, Seek, SeekFrom};
+use crate::exe286::header::NewExecutableHeader;
 use crate::types::PascalString;
 
 ///
@@ -23,9 +24,17 @@ pub struct NonResidentNameTable {
 }
 
 impl NonResidentNameTable {
-    pub fn read<R: Read>(r: &mut R) -> io::Result<Self> {
+    pub fn read<R: Read + Seek>(reader: &mut R, e_nres_tab: u32) -> io::Result<Self> {
         let mut entries = Vec::new();
-        while let Some(entry) = NonResidentNameEntry::read(r)? {
+        // In practice, we don't need actually `e_cbnres` field from NE header.
+        // If non-resident table is empty - it defines in moment without this helping hand
+        if e_nres_tab == 0 {
+            return Ok(Self { entries })
+        }
+
+        reader.seek(SeekFrom::Start(e_nres_tab as u64))?;
+
+        while let Some(entry) = NonResidentNameEntry::read(reader)? {
             entries.push(entry);
         }
         Ok(Self { entries })

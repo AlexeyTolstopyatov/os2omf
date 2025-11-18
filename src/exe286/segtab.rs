@@ -110,14 +110,14 @@ pub struct ImportsTable {
 impl ImportsTable {
     pub fn read<T: Read + Seek>(
         reader: &mut T,
-        relocs: &RelocationTable,
+        rel_tab: &RelocationTable,
         imp_tab: u32,
         mod_tab: u32,
         seg_number: i32,
     ) -> io::Result<Self> {
         let mut imp_list = Vec::new();
 
-        for reloc in &relocs.rel_entries {
+        for reloc in &rel_tab.rel_entries {
             match &reloc.rel_type {
                 RelocationType::ImportName(import_name) => {
                     if let Some(import) = Self::read_import_name(
@@ -155,8 +155,8 @@ impl ImportsTable {
             None => return Ok(None),
         };
 
-        let dll_name = Self::read_module_name(reader, imp_tab, mod_offset)?;
-        let proc_name = Self::read_procedure_name(reader, imp_tab, import_name.imp_offset)?;
+        let dll_name = Self::read_module_str(reader, imp_tab, mod_offset)?;
+        let proc_name = Self::read_procedure_str(reader, imp_tab, import_name.imp_offset)?;
 
         Ok(Some(DllImport::new(
             dll_name,
@@ -178,7 +178,7 @@ impl ImportsTable {
             None => return Ok(None),
         };
 
-        let dll_name = Self::read_module_name(reader, imp_tab, mod_offset)?;
+        let dll_name = Self::read_module_str(reader, imp_tab, mod_offset)?;
 
         Ok(Some(DllImport::new(
             dll_name,
@@ -203,7 +203,7 @@ impl ImportsTable {
         Ok(if mod_offset == 0 { None } else { Some(mod_offset) })
     }
 
-    fn read_module_name<T: Read + Seek>(
+    fn read_module_str<T: Read + Seek>(
         reader: &mut T,
         imp_tab: u32,
         mod_offset: u16,
@@ -220,7 +220,7 @@ impl ImportsTable {
         Ok(PascalString::new(mod_len, name))
     }
 
-    fn read_procedure_name<T: Read + Seek>(
+    fn read_procedure_str<T: Read + Seek>(
         reader: &mut T,
         imp_tab: u32,
         imp_offset: u16,

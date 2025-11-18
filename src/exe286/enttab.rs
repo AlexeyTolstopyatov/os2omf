@@ -1,5 +1,5 @@
 use std::convert::TryInto;
-use std::io::{self, Read};
+use std::io::{self, Read, Seek, SeekFrom};
 
 
 ///
@@ -25,22 +25,19 @@ pub struct EntryTable {
 }
 
 impl EntryTable {
-    ///
-    /// Attempts to rewrite my logic.
-    /// Algorithm mostly bases on Microsoft NE segmentation format.pdf
-    ///
-    /// \param r -- binary reader instance
-    /// \param cb_ent_tab -- bundles count in EntryTable /see NE Header/
-    ///
-    pub fn read<R: Read>(r: &mut R, cb_ent_tab: u16) -> io::Result<Self> {
+    pub fn read<R: Read + Seek>(reader: &mut R, e_enttab: u64, cb_ent_tab: u16) -> io::Result<Self> {
         let mut entries: Vec<Entry> = Vec::new();
+        // In practice: pointer checking optional operation too
+        // If file really linked as New Executable (by Microsoft LINK.EXE)
+        // Independent on format version -- wrong pointer *always* return empty entry table
+        reader.seek(SeekFrom::Start(e_enttab))?;
         let mut bytes_remaining = cb_ent_tab;
         let mut _ordinal: u16 = 1; // entry index means ordinal in non/resident names tables
 
         while bytes_remaining > 0 {
             // Read bundle header
             let mut buffer = [0; 2];
-            r.read_exact(&mut buffer)?;
+            reader.read_exact(&mut buffer)?;
             bytes_remaining -= 2;
 
             let entries_count = buffer[0];
@@ -76,14 +73,11 @@ impl EntryTable {
             }
             bytes_remaining -= bundle_size;
 
-            // Process each entry in the bundle
             for _ in 0..entries_count {
                 let entry = if seg_id == 0xFF {
-                    // Movable segment entry (6 bytes)
-                    Entry::Moveable(MoveableEntry::read(r)?)
+                    Entry::Moveable(MoveableEntry::read(reader)?)
                 } else {
-                    // Fixed segment entry (3 bytes)
-                    Entry::Fixed(FixedEntry::read(r, seg_id)?)
+                    Entry::Fixed(FixedEntry::read(reader, seg_id)?)
                 };
                 entries.push(entry);
                 _ordinal += 1;

@@ -1,4 +1,4 @@
-use std::io::{self, Read};
+use std::io::{self, Read, Seek, SeekFrom};
 use bytemuck::{Pod, Zeroable};
 
 use crate::exe286;
@@ -63,7 +63,9 @@ impl CPU {
 /// Interface of New Executable header
 /// 
 impl NewExecutableHeader {
-    pub fn read<TRead: Read>(r: &mut TRead) -> io::Result<Self> {
+    pub fn read<TRead: Read + Seek>(r: &mut TRead, e_lfanew: u32) -> io::Result<Self> {
+        r.seek(SeekFrom::Start(e_lfanew as u64))?;
+        
         let mut buf = [0; 0x40];
         r.read_exact(&mut buf)?;
 

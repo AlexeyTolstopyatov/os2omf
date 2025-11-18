@@ -32,19 +32,20 @@ pub struct LXObjectPageData {
     pub number: u32
 }
 impl ObjectPagesTable {
-    pub fn read<T: Read>(
+    pub fn read<T: Read + Seek>(
         reader: &mut T,
+        obj_map: u64,
         pages_count: u32,
         pages_shift: u32,
         magic: u16,
         ) -> io::Result<Self> {
         let mut pages = Vec::<ObjectPage>::with_capacity(pages_count as usize);
-
+        reader.seek(SeekFrom::Start(obj_map))?;
         match magic {
             exe386::header::LX_CIGAM => Self::fill_lx_pages(reader, &mut pages, pages_shift),
             exe386::header::LX_MAGIC => Self::fill_lx_pages(reader, &mut pages, pages_shift),
-            exe386::header::LE_CIGAM => {},
-            exe386::header::LE_MAGIC => {},
+            exe386::header::LE_CIGAM => Self::fill_le_pages(reader, &mut pages, pages_count),
+            exe386::header::LE_MAGIC => Self::fill_le_pages(reader, &mut pages, pages_count),
             _ => unreachable!()
         }
 

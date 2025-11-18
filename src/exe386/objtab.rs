@@ -1,4 +1,4 @@
-use std::io::{Error, Read};
+use std::io::{Error, Read, Seek, SeekFrom};
 use bytemuck::{Pod, Zeroable};
 
 #[repr(C)]
@@ -67,12 +67,12 @@ pub struct ObjectsTable {
     pub objects: Vec<Object>,
 }
 impl ObjectsTable {
-    pub fn read<T: Read>(r: &mut T, count: u32) -> Result<ObjectsTable, Error> {
+    pub fn read<T: Read + Seek>(reader: &mut T, objtab: u64, count: u32) -> Result<ObjectsTable, Error> {
         let mut objects = Vec::<Object>::new();
-
+        reader.seek(SeekFrom::Start(objtab))?;
         for _ in 0..count {
             let mut caught_obj = [0; 24];
-            r.read_exact(&mut caught_obj)?;
+            reader.read_exact(&mut caught_obj)?;
             objects.push(bytemuck::cast(caught_obj));
         }
 

@@ -1,6 +1,6 @@
 use bytemuck::{Pod, Zeroable};
 use std::io::{Error, ErrorKind, Read};
-use crate::TargetObject;
+use crate::{exe386, TargetObject};
 
 pub const LX_MAGIC: u16 = 0x584c;
 pub const LX_CIGAM: u16 = 0x4c58;
@@ -114,6 +114,55 @@ impl LinearExecutableHeader {
             _ => TargetObject::MZModule
         }
     }
+    pub fn external_relocs_stripped(&self) -> bool {
+        self.e32_mflags & 0x00000020 != 0
+    }
+    ///
+    /// The setting of this bit in a Linear Executable Module indicates that each
+    /// object of the module has a preferred load address specified in the Object
+    /// Table Reloc Base Addr. If the module's objects can not be loaded at these
+    /// preferred addresses, then the relocation records that have been retained in
+    /// the file data will be applied
+    ///
+    /// In practice if internal relocations stripped -- module still
+    /// has fixup records table. But doesn't contain internal fixups.
+    ///
+    pub fn internal_relocs_stripped(&self) -> bool {
+        self.e32_mflags & 0x00000010 != 0
+    }
+    pub fn module_type(&self) -> LinearExecutableType {
+        if self.e32_mflags & 0x00008000 != 0 {
+            return LinearExecutableType::DLL;
+        }
+        if self.e32_mflags & 0x00020000 != 0 {
+            return LinearExecutableType::PDD;
+        }
+        if self.e32_mflags & 0x00028000 != 0 {
+            return LinearExecutableType::VDD;
+        }
+        if self.e32_mflags & 0x00030000 != 0 {
+            return LinearExecutableType::DLD;
+        }
+        LinearExecutableType::EXE
+    }
+    ///
+    /// Be carefully: Only LE-ordered files are supported!
+    ///
+    pub fn le_byte_ordering(&self) -> bool {
+        if self.e32_border == 0 && self.e32_worder == 0 {
+            return true;
+        }
+        false
+    }
+    pub fn has_valid_magic(&self) -> bool {
+        match self.e32_magic {
+            LX_MAGIC => true,
+            LX_CIGAM => true,
+            LE_MAGIC => true,
+            LE_CIGAM => true,
+            _ => false,
+        }
+    }
 }
 #[repr(u16)]
 pub enum CPU {
@@ -169,46 +218,7 @@ impl LinearExecutableFlags {
             minor_ver: minor_ver as u16,
         }
     }
-    pub fn external_relocs_stripped(&self) -> bool {
-        self.flags & 0x00000020 != 0
-    }
-    /// 
-    /// The setting of this bit in a Linear Executable Module indicates that each
-    /// object of the module has a preferred load address specified in the Object
-    /// Table Reloc Base Addr. If the module's objects can not be loaded at these
-    /// preferred addresses, then the relocation records that have been retained in
-    /// the file data will be applied
-    /// 
-    /// In practice if internal relocations stripped -- module still
-    /// has fixup records table. But doesn't contain internal fixups.
-    /// 
-    pub fn internal_relocs_stripped(&self) -> bool {
-        self.flags & 0x00000010 != 0
-    }
-    pub fn module_type(&self) -> LinearExecutableType {
-        if self.flags & 0x00008000 != 0 {
-            return LinearExecutableType::DLL;
-        }
-        if self.flags & 0x00020000 != 0 {
-            return LinearExecutableType::PDD;
-        }
-        if self.flags & 0x00028000 != 0 {
-            return LinearExecutableType::VDD;
-        }
-        if self.flags & 0x00030000 != 0 {
-            return LinearExecutableType::DLD;
-        }
-        LinearExecutableType::EXE
-    }
-    ///
-    /// Be carefully: Only LE-ordered files are supported!
-    /// 
-    pub fn le_byte_ordering(&self) -> bool {
-        if self.bo == 0 && self.wo == 0 {
-            return true;
-        }
-        false
-    }
+
 }
 //
 // Mostly reverse engineering of LE linked binaries bases

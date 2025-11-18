@@ -80,7 +80,8 @@ impl FixupRecordsTable {
         fixup_record_table_offset: u64,
     ) -> io::Result<Self> {
         let mut records = Vec::new();
-
+        reader.seek(SeekFrom::Start(fixup_record_table_offset))?;
+        
         for (logical_page, &page_offset) in fixup_page_table.page_offsets.iter().enumerate() {
             let record_offset = fixup_record_table_offset + page_offset as u64;
             reader.seek(SeekFrom::Start(record_offset))?;

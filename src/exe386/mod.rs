@@ -16,11 +16,11 @@ pub mod objtab;
 pub mod enttab;
 pub mod frectab;
 pub mod imptab;
-mod nrestab;
-mod resntab;
-mod objpagetab;
-mod fpagetab;
-mod dirtab;
+pub mod nrestab;
+pub mod resntab;
+pub mod objpagetab;
+pub mod fpagetab;
+pub mod dirtab;
 
 pub(crate) struct LinearExecutableLayout {
     pub header: LinearExecutableHeader,
@@ -34,7 +34,7 @@ pub(crate) struct LinearExecutableLayout {
 }
 
 impl LinearExecutableLayout {
-    pub fn read(path: &str) -> Result<Self, Error> {
+    pub fn get(path: &str) -> Result<Self, Error> {
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);
         let mut sig_buffer = [0_u8; 2];
@@ -61,43 +61,50 @@ impl LinearExecutableLayout {
 
         header = LinearExecutableHeader::read(&mut reader)?;
 
-        let __offset = |ptr: u32| -> u64 {
+        let offset = |ptr: u32| -> u64 {
             ptr as u64 + base_offset
         };
 
-        if header.e32_magic != LX_CIGAM && header.e32_magic != LX_MAGIC {
+        if !header.has_valid_magic() { 
             return Err(Error::new(ErrorKind::Other, "Unable to read module as linear executable"));
         }
-        reader.seek(SeekFrom::Start(__offset(header.e32_objmap)))?;
-        let object_pages = ObjectPagesTable::read(&mut reader, header.e32_mpages, header.e32_pageshift_or_lastpage, header.e32_magic)?;
         
-        reader.seek(SeekFrom::Start(__offset(header.e32_objtab)))?;
-        let object_table = ObjectsTable::read(&mut reader, header.e32_objcnt)?;
-        
-        reader.seek(SeekFrom::Start(__offset(header.e32_enttab)))?;
-        let entry_table = EntryTable::read(&mut reader)?;
-
-        reader.seek(SeekFrom::Start(__offset(header.e32_fpagetab)))?;
-        let fixup_pages = FixupPageTable::read(&mut reader, &header)?;
-
-        reader.seek(SeekFrom::Start(__offset(header.e32_frectab)))?;
+        let object_pages = ObjectPagesTable::read(
+            &mut reader,
+            offset(header.e32_objmap),
+            header.e32_mpages,
+            header.e32_pageshift_or_lastpage,
+            header.e32_magic
+        )?;
+        let object_table = ObjectsTable::read(
+            &mut reader,
+            offset(header.e32_objtab),
+            header.e32_objcnt
+        )?;
+        reader.seek(SeekFrom::Start(offset(header.e32_enttab)))?;
+        let entry_table = EntryTable::read(
+            &mut reader,
+            offset(header.e32_enttab)
+        )?;
+        reader.seek(SeekFrom::Start(offset(header.e32_fpagetab)))?;
+        let fixup_page_table = FixupPageTable::read(
+            &mut reader, 
+            &header
+        )?;
         let fixup_records = FixupRecordsTable::read(
             &mut reader,
-            &fixup_pages,
-            __offset(header.e32_frectab) // <-- expected relative or an absolute value?
+            &fixup_page_table,
+            offset(header.e32_frectab)
         )?;
-
         let import_table = ImportRelocationsTable::read(
             &mut reader,
             ImportData{
-                imp_mod_offset: __offset(header.e32_impmod),
-                imp_proc_offset: __offset(header.e32_impproc),
+                imp_mod_offset: offset(header.e32_impmod),
+                imp_proc_offset: offset(header.e32_impproc),
                 fixup_records: fixup_records.records,
             }
         )?;
-
         let mut module_directives_table = ModuleDirectivesTable::empty();
-
         if header.e32_dirtab != 0 {
             module_directives_table = ModuleDirectivesTable::read(
                 &mut reader,
@@ -112,7 +119,7 @@ impl LinearExecutableLayout {
             object_pages,
             entry_table,
             import_table,
-            fixup_page_table: fixup_pages,
+            fixup_page_table,
             module_directives_table
         })
     }

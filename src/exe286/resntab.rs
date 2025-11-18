@@ -1,4 +1,4 @@
-use std::io::{self, Read};
+use std::io::{self, Read, Seek, SeekFrom};
 use crate::types::PascalString;
 
 ///
@@ -24,9 +24,11 @@ pub struct ResidentNameTable {
 }
 
 impl ResidentNameTable {
-    pub fn read<R: Read>(r: &mut R) -> io::Result<Self> {
+    pub fn read<R: Read + Seek>(reader: &mut R, e_resntab: u64) -> io::Result<Self> {
         let mut entries = Vec::new();
-        while let Some(entry) = ResidentNameEntry::read(r)? {
+        reader.seek(SeekFrom::Start(e_resntab))?;
+        
+        while let Some(entry) = ResidentNameEntry::read(reader)? {
             entries.push(entry);
         }
         Ok(Self { entries })

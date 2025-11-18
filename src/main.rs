@@ -14,7 +14,7 @@ pub enum TargetObject {
 ///  - rustc 1.88.0 (6b00bc388 2025-06-23)
 ///  - bytemuck 1.24.0
 fn main() -> std::io::Result<()> {
-    let exec = exe386::LinearExecutableLayout::read("D:\\TEST\\ARCA\\BDCALLS.DLL")?;
+    let exec = exe386::LinearExecutableLayout::get("D:\\TEST\\ARCA\\BDCALLS.DLL")?;
 
     Ok(())
 }

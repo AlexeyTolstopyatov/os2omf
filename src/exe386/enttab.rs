@@ -1,5 +1,5 @@
 use std::io;
-use std::io::Read;
+use std::io::{Read, Seek, SeekFrom};
 
 #[derive(Debug, Clone)]
 pub struct EntryBundle {
@@ -72,9 +72,10 @@ pub enum Entry {
 }
 
 impl EntryTable {
-    pub fn read<T: Read>(reader: &mut T) -> io::Result<Self> {
+    pub fn read<T: Read + Seek>(reader: &mut T, enttab: u64) -> io::Result<Self> {
         let mut bundles = Vec::new();
-
+        reader.seek(SeekFrom::Start(enttab))?;
+        
         loop {
             let mut count_buf = [0u8];
             reader.read_exact(&mut count_buf)?;

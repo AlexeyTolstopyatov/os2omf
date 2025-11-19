@@ -81,15 +81,17 @@ impl FixupRecordsTable {
     ) -> io::Result<Self> {
         let mut records = Vec::new();
         reader.seek(SeekFrom::Start(fixup_record_table_offset))?;
-        
+
         for (logical_page, &page_offset) in fixup_page_table.page_offsets.iter().enumerate() {
             let record_offset = fixup_record_table_offset + page_offset as u64;
             reader.seek(SeekFrom::Start(record_offset))?;
 
             // I can read records till next page offset!
             // For elsewhere it throws unexpected problems
-            
-            let next_offset = fixup_page_table.page_offsets.get(logical_page + 1)
+
+            let next_offset = fixup_page_table
+                .page_offsets
+                .get(logical_page + 1)
                 .copied()
                 .unwrap_or(fixup_page_table.end_of_fixup_records);
 
@@ -102,9 +104,7 @@ impl FixupRecordsTable {
             }
         }
 
-        Ok(Self { 
-            records 
-        })
+        Ok(Self { records })
     }
 
     fn read_single_fixup_record<R: Read>(reader: &mut R) -> io::Result<Option<FixupRecord>> {
@@ -181,7 +181,10 @@ impl FixupRecordsTable {
         }
     }
 
-    fn read_internal_target<R: Read>(reader: &mut R, flags: &FixupFlags) -> io::Result<FixupTarget> {
+    fn read_internal_target<R: Read>(
+        reader: &mut R,
+        flags: &FixupFlags,
+    ) -> io::Result<FixupTarget> {
         let object_number = match flags.is_16bit_object_module {
             true => {
                 let mut obj_buf = [0_u8; 2];
@@ -225,7 +228,7 @@ impl FixupRecordsTable {
         let module_ordinal = match flags.is_16bit_object_module {
             true => {
                 let mut mod_buf = [0_u8; 2];
-            reader.read_exact(&mut mod_buf)?;
+                reader.read_exact(&mut mod_buf)?;
                 u16::from_le_bytes(mod_buf)
             }
             false => {
@@ -262,7 +265,7 @@ impl FixupRecordsTable {
         let module_ordinal = match flags.is_16bit_object_module {
             true => {
                 let mut mod_buf = [0_u8; 2];
-            reader.read_exact(&mut mod_buf)?;
+                reader.read_exact(&mut mod_buf)?;
                 u16::from_le_bytes(mod_buf)
             }
             false => {
@@ -307,7 +310,6 @@ impl FixupRecordsTable {
                 entry_buf[0] as u16
             }
         };
-
 
         Ok(FixupTarget::FixupViaEntryTable(FixupTargetEntryTable {
             entry_number,

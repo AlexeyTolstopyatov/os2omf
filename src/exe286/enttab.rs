@@ -1,7 +1,6 @@
 use std::convert::TryInto;
 use std::io::{self, Read, Seek, SeekFrom};
 
-
 ///
 /// This table contains one member for every entry point in the program (EXE/DRV/SYS) or
 /// library module (DLL).
@@ -25,7 +24,11 @@ pub struct EntryTable {
 }
 
 impl EntryTable {
-    pub fn read<R: Read + Seek>(reader: &mut R, e_enttab: u64, cb_ent_tab: u16) -> io::Result<Self> {
+    pub fn read<R: Read + Seek>(
+        reader: &mut R,
+        e_enttab: u64,
+        cb_ent_tab: u16,
+    ) -> io::Result<Self> {
         let mut entries: Vec<Entry> = Vec::new();
         // In practice: pointer checking optional operation too
         // If file really linked as New Executable (by Microsoft LINK.EXE)
@@ -67,8 +70,10 @@ impl EntryTable {
             if bundle_size > bytes_remaining {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
-                    format!("Bundle size exceeds remaining bytes: bundle_size={}, remaining={}",
-                            bundle_size, bytes_remaining),
+                    format!(
+                        "Bundle size exceeds remaining bytes: bundle_size={}, remaining={}",
+                        bundle_size, bytes_remaining
+                    ),
                 ));
             }
             bytes_remaining -= bundle_size;

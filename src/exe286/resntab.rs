@@ -1,5 +1,5 @@
-use std::io::{self, Read, Seek, SeekFrom};
 use crate::types::PascalString;
+use std::io::{self, Read, Seek, SeekFrom};
 
 ///
 /// This table contains a list of ASCII strings.
@@ -27,7 +27,7 @@ impl ResidentNameTable {
     pub fn read<R: Read + Seek>(reader: &mut R, e_resntab: u64) -> io::Result<Self> {
         let mut entries = Vec::new();
         reader.seek(SeekFrom::Start(e_resntab))?;
-        
+
         while let Some(entry) = ResidentNameEntry::read(reader)? {
             entries.push(entry);
         }
@@ -64,7 +64,7 @@ impl ResidentNameEntry {
         };
         Ok(Some(Self {
             name: PascalString::new(len, name),
-            ordinal: index
+            ordinal: index,
         }))
     }
 }

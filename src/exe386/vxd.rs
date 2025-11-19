@@ -7,9 +7,9 @@ use bytemuck::{Pod, Zeroable};
 /// MS-DOS Mz-executables was an applications what runs
 /// in IA-32 real-mode and strongly requires physical devices
 /// for themselves to work correctly.
-/// 
+///
 /// Windows virtual device drivers are emulates work
-/// of physical devices and gives all processed signals 
+/// of physical devices and gives all processed signals
 /// to VMM. Only VMM has rights to call physical devices.
 ///  
 #[repr(C, packed(1))]

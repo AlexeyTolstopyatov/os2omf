@@ -1,11 +1,11 @@
-use std::io::{self, Read, Seek, SeekFrom};
 use bytemuck::{Pod, Zeroable};
+use std::io::{self, Read, Seek, SeekFrom};
 
 use crate::exe286;
 
 ///
 /// OS/2 & Windows file header definitions
-/// 
+///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
 #[repr(C)]
 pub struct NewExecutableHeader {
@@ -35,7 +35,7 @@ pub struct NewExecutableHeader {
     pub e_crsrc: u16,
     pub e_os: u8,
     pub e_flag_others: u8,
-    pub e_ret_thunk: u16, // <-- offset
+    pub e_ret_thunk: u16,    // <-- offset
     pub e_segref_thunk: u16, // <-- segment reference thunk offset
     pub min_code_swap: u16,
     pub expected_win_ver: [u8; 2],
@@ -55,33 +55,32 @@ impl CPU {
             0x0005 => CPU::I286,
             0x0006 => CPU::I386,
             0x0007 => CPU::I8087,
-            _ => CPU::Undefined
+            _ => CPU::Undefined,
         }
     }
 }
 ///
 /// Interface of New Executable header
-/// 
+///
 impl NewExecutableHeader {
     pub fn read<TRead: Read + Seek>(r: &mut TRead, e_lfanew: u32) -> io::Result<Self> {
         r.seek(SeekFrom::Start(e_lfanew as u64))?;
-        
+
         let mut buf = [0; 0x40];
         r.read_exact(&mut buf)?;
 
         Ok(bytemuck::cast(buf))
     }
     /// Returns the check magic of [`NewExecutableHeader`].
-    /// 
+    ///
     /// # Errors
     /// This function will return an error if header contains
     /// unexpected magic number.
     pub(crate) fn is_valid_magic(&self) -> bool {
-
         match u16::from_le_bytes(self.e_magic) {
             exe286::NE_CIGAM => true,
             exe286::NE_MAGIC => true,
-            _ => false
+            _ => false,
         }
     }
     pub(crate) fn get_flags(&self) -> Vec<String> {

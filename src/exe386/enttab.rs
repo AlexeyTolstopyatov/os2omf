@@ -75,7 +75,7 @@ impl EntryTable {
     pub fn read<T: Read + Seek>(reader: &mut T, enttab: u64) -> io::Result<Self> {
         let mut bundles = Vec::new();
         reader.seek(SeekFrom::Start(enttab))?;
-        
+
         loop {
             let mut count_buf = [0u8];
             reader.read_exact(&mut count_buf)?;
@@ -89,13 +89,14 @@ impl EntryTable {
             reader.read_exact(&mut type_buf)?;
             let bundle_type = BundleType::from(type_buf[0]);
 
-            let object = if bundle_type != BundleType::Unused && bundle_type != BundleType::Forwarder {
-                let mut obj_buf = [0u8; 2];
-                reader.read_exact(&mut obj_buf)?;
-                u16::from_le_bytes(obj_buf)
-            } else {
-                0
-            };
+            let object =
+                if bundle_type != BundleType::Unused && bundle_type != BundleType::Forwarder {
+                    let mut obj_buf = [0u8; 2];
+                    reader.read_exact(&mut obj_buf)?;
+                    u16::from_le_bytes(obj_buf)
+                } else {
+                    0
+                };
 
             let mut entries = Vec::with_capacity(count as usize);
             for _ in 0..count {
@@ -104,23 +105,23 @@ impl EntryTable {
                     BundleType::Entry16 => {
                         let entry_data = Entry16::read(reader)?;
                         Entry::Entry16(entry_data)
-                    },
+                    }
                     BundleType::Entry286CallGate => {
                         let entry_data = EntryCallGate::read(reader)?;
                         Entry::EntryCallGate(entry_data)
-                    },
+                    }
                     BundleType::Entry32 => {
                         let entry_data = Entry32::read(reader)?;
                         Entry::Entry32(entry_data)
-                    },
+                    }
                     BundleType::Forwarder => {
                         let entry_data = EntryForwarder::read(reader)?;
                         Entry::EntryForwarder(entry_data)
-                    },
+                    }
                     BundleType::Unknown(unknown_type) => {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidData,
-                            format!("Unknown bundle type: 0x{:02x}", unknown_type)
+                            format!("Unknown bundle type: 0x{:02x}", unknown_type),
                         ));
                     }
                 };

@@ -1,4 +1,3 @@
-
 use crate::exe286::segrelocs::{RelocationTable, RelocationType};
 use crate::types::PascalString;
 use std::io::{self, Read, Seek, SeekFrom};
@@ -23,17 +22,15 @@ pub struct Segment {
 
 impl Segment {
     pub fn read<T: Read + Seek>(reader: &mut T, alignment: u16) -> io::Result<Self> {
-        let alignment = if alignment == 0 { 
-            9 
-        } else { 
-            alignment
-        };
+        let alignment = if alignment == 0 { 9 } else { alignment };
         let header = SegmentHeader::read(reader)?;
 
         let relocs = if !header.relocations_stripped() {
             Self::read_relocs(reader, alignment.into(), &header)?
         } else {
-            RelocationTable { rel_entries: vec![] }
+            RelocationTable {
+                rel_entries: vec![],
+            }
         };
 
         Ok(Self {
@@ -47,7 +44,7 @@ impl Segment {
     fn read_relocs<T: Read + Seek>(
         reader: &mut T,
         alignment: u64,
-        header: &SegmentHeader
+        header: &SegmentHeader,
     ) -> io::Result<RelocationTable> {
         let position = match (header.sector_base as u64).checked_mul(1 << alignment) {
             Some(base_shifted) => base_shifted.checked_add(header.sector_length as u64),
@@ -56,7 +53,11 @@ impl Segment {
 
         let position = match position {
             Some(pos) => pos,
-            None => return Ok(RelocationTable { rel_entries: vec![] }),
+            None => {
+                return Ok(RelocationTable {
+                    rel_entries: vec![],
+                });
+            }
         };
 
         let current_pos = reader.stream_position()?;
@@ -64,7 +65,9 @@ impl Segment {
         reader.seek(SeekFrom::Start(current_pos))?;
 
         if position + 2 > file_length {
-            return Ok(RelocationTable { rel_entries: vec![] });
+            return Ok(RelocationTable {
+                rel_entries: vec![],
+            });
         }
 
         reader.seek(SeekFrom::Start(position))?;
@@ -90,7 +93,12 @@ impl Segment {
 
 // Более идиоматичная реализация для DllImport
 impl DllImport {
-    pub fn new(dll_name: PascalString, name: PascalString, ordinal: u16, file_pointer: u64) -> Self {
+    pub fn new(
+        dll_name: PascalString,
+        name: PascalString,
+        ordinal: u16,
+        file_pointer: u64,
+    ) -> Self {
         Self {
             dll_name,
             name,
@@ -120,16 +128,16 @@ impl ImportsTable {
         for reloc in &rel_tab.rel_entries {
             match &reloc.rel_type {
                 RelocationType::ImportName(import_name) => {
-                    if let Some(import) = Self::read_import_name(
-                        reader, import_name, imp_tab, mod_tab
-                    )? {
+                    if let Some(import) =
+                        Self::read_import_name(reader, import_name, imp_tab, mod_tab)?
+                    {
                         imp_list.push(import);
                     }
                 }
                 RelocationType::ImportOrdinal(import_ord) => {
-                    if let Some(import) = Self::read_import_ordinal(
-                        reader, import_ord, imp_tab, mod_tab
-                    )? {
+                    if let Some(import) =
+                        Self::read_import_ordinal(reader, import_ord, imp_tab, mod_tab)?
+                    {
                         imp_list.push(import);
                     }
                 }
@@ -200,7 +208,11 @@ impl ImportsTable {
         reader.read_exact(&mut mod_offset_buf)?;
         let mod_offset = u16::from_le_bytes(mod_offset_buf);
 
-        Ok(if mod_offset == 0 { None } else { Some(mod_offset) })
+        Ok(if mod_offset == 0 {
+            None
+        } else {
+            Some(mod_offset)
+        })
     }
 
     fn read_module_str<T: Read + Seek>(
@@ -292,14 +304,14 @@ pub enum NeSegmentRights {
     DATA = 1,
     /// Rights of 16-bit .rdata segment
     ///  - READABLE
-    RDATA= 2,
+    RDATA = 2,
     ///
     /// My custom new-type of segment without
     /// embedded data. In original documents there's no
     /// any .bss named segments and all segments are unnamed by nature,
     /// Rights of 16-bit ~.bss~ data segment defines by the flags
     ///
-    BSS = 3
+    BSS = 3,
 }
 const SEG_HASMASK: u16 = 0x0007;
 ///
@@ -323,7 +335,7 @@ const SEG_PRELOAD: u16 = 0x0040;
 /// If application requires FPU -> Windows emulates it and contains special
 /// marks in per-segment relocations named like "OS-Fixups".
 ///
-const SEG_RELOCS:  u16 = 0x0100;
+const SEG_RELOCS: u16 = 0x0100;
 ///
 /// If segment marked as discardable - it can be unloaded
 /// after application runs.
@@ -338,9 +350,7 @@ impl SegmentHeader {
     pub fn read<TRead: Read>(r: &mut TRead) -> io::Result<Self> {
         let mut buf = [0; 0x8];
         r.read_exact(&mut buf)?;
-        let get_u16 = |pos| u16::from_le_bytes(buf[pos..pos + 2]
-            .try_into()
-            .unwrap());
+        let get_u16 = |pos| u16::from_le_bytes(buf[pos..pos + 2].try_into().unwrap());
 
         Ok(Self {
             sector_base: get_u16(0),

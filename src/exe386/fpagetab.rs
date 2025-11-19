@@ -1,7 +1,7 @@
-use std::io;
-use std::io::{Read, Seek, SeekFrom};
 use crate::exe386::frectab::FixupRecord;
 use crate::exe386::header::LinearExecutableHeader;
+use std::io;
+use std::io::{Read, Seek, SeekFrom};
 
 #[derive(Debug, Clone)]
 pub struct FixupPageTable {
@@ -16,8 +16,10 @@ pub struct FixupRecordTable {
 impl FixupPageTable {
     pub fn read<R: Read + Seek>(
         reader: &mut R,
+        fpagetab: u64,
         header: &LinearExecutableHeader,
     ) -> io::Result<Self> {
+        reader.seek(SeekFrom::Start(fpagetab))?;
         if header.e32_fpagetab == 0 {
             return Ok(Self {
                 page_offsets: Vec::new(),
@@ -35,8 +37,12 @@ impl FixupPageTable {
             page_offsets.push(u32::from_le_bytes(buf));
         }
 
-        let end_of_fixup_records = page_offsets.pop()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "No end marker in fixup page table"))?;
+        let end_of_fixup_records = page_offsets.pop().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "No end marker in fixup page table",
+            )
+        })?;
 
         Ok(Self {
             page_offsets,

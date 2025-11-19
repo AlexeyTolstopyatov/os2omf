@@ -1,11 +1,11 @@
 // Non-Resident names table. (look at the header specs)
-use std::io::{self, Read, Seek, SeekFrom};
 use crate::exe286::header::NewExecutableHeader;
 use crate::types::PascalString;
+use std::io::{self, Read, Seek, SeekFrom};
 
 ///
-/// This table contains a list of ASCII strings. 
-/// The first string is the module description from the module definition file. 
+/// This table contains a list of ASCII strings.
+/// The first string is the module description from the module definition file.
 ///
 /// The other strings are the names of all exported functions listed in the module
 /// definition file that have ordinal numbers associated with them.
@@ -29,7 +29,7 @@ impl NonResidentNameTable {
         // In practice, we don't need actually `e_cbnres` field from NE header.
         // If non-resident table is empty - it defines in moment without this helping hand
         if e_nres_tab == 0 {
-            return Ok(Self { entries })
+            return Ok(Self { entries });
         }
 
         reader.seek(SeekFrom::Start(e_nres_tab as u64))?;
@@ -67,6 +67,9 @@ impl NonResidentNameEntry {
             r.read_exact(&mut buf)?;
             u16::from_le_bytes(buf)
         };
-        Ok(Some(Self { name: PascalString::new(len, name), ordinal: index }))
+        Ok(Some(Self {
+            name: PascalString::new(len, name),
+            ordinal: index,
+        }))
     }
 }

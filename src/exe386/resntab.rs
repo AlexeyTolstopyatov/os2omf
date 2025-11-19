@@ -1,6 +1,6 @@
+use crate::types::PascalString;
 use std::io;
 use std::io::Read;
-use crate::types::PascalString;
 
 #[derive(Debug, Clone)]
 pub struct ResidentNameEntry {
@@ -28,6 +28,9 @@ impl ResidentNameEntry {
             r.read_exact(&mut buf)?;
             u16::from_le_bytes(buf)
         };
-        Ok(Some(Self { name: PascalString::new(len, name), ordinal: index }))
+        Ok(Some(Self {
+            name: PascalString::new(len, name),
+            ordinal: index,
+        }))
     }
 }

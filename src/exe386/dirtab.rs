@@ -1,7 +1,7 @@
+use crate::exe386::header::LinearExecutableHeader;
+use bytemuck::{Pod, Zeroable};
 use std::io;
 use std::io::{Read, Seek, SeekFrom};
-use bytemuck::{Pod, Zeroable};
-use crate::exe386::header::LinearExecutableHeader;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
@@ -70,11 +70,11 @@ impl ModuleDirectivesTable {
     pub fn read<R: Read + Seek>(
         reader: &mut R,
         header: &LinearExecutableHeader,
-        e_lfanew: u64
+        e_lfanew: u64,
     ) -> io::Result<Self> {
         if header.e32_impmod == 0 || header.e32_impmodcnt == 0 {
-            return Ok(Self{ 
-                directives: Vec::new()
+            return Ok(Self {
+                directives: Vec::new(),
             });
         }
 
@@ -150,12 +150,16 @@ impl ModuleDirectivesTable {
 
                 let object_number = u16::from_le_bytes([data[offset], data[offset + 1]]);
                 let base_address = u32::from_le_bytes([
-                    data[offset + 2], data[offset + 3],
-                    data[offset + 4], data[offset + 5],
+                    data[offset + 2],
+                    data[offset + 3],
+                    data[offset + 4],
+                    data[offset + 5],
                 ]);
                 let virtual_size = u32::from_le_bytes([
-                    data[offset + 6], data[offset + 7],
-                    data[offset + 8], data[offset + 9],
+                    data[offset + 6],
+                    data[offset + 7],
+                    data[offset + 8],
+                    data[offset + 9],
                 ]);
                 offset += 10;
 

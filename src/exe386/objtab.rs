@@ -1,5 +1,5 @@
-use std::io::{Error, Read, Seek, SeekFrom};
 use bytemuck::{Pod, Zeroable};
+use std::io::{Error, Read, Seek, SeekFrom};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Zeroable, Pod)]
@@ -9,19 +9,19 @@ pub struct Object {
     pub flags: u32,
     pub map_index: u32,
     pub map_size: u32,
-    pub _reserved: u32
+    pub _reserved: u32,
 }
 impl Object {
     pub fn get_object_rights(&self) -> LXObjectRights {
         if self.virtual_size == 0 {
             return LXObjectRights::BSS;
         }
-        
+
         match self.flags & 0x0002 {
             0 => LXObjectRights::SETTER,
             3 => LXObjectRights::DATA,
             6 => LXObjectRights::CODE,
-            _ => LXObjectRights::RDATA
+            _ => LXObjectRights::RDATA,
         }
     }
 }
@@ -61,13 +61,17 @@ pub enum LXObjectRights {
     ///  - EXEC
     GOD = 5,
     /// Non-readable object
-    SETTER = 7
+    SETTER = 7,
 }
 pub struct ObjectsTable {
     pub objects: Vec<Object>,
 }
 impl ObjectsTable {
-    pub fn read<T: Read + Seek>(reader: &mut T, objtab: u64, count: u32) -> Result<ObjectsTable, Error> {
+    pub fn read<T: Read + Seek>(
+        reader: &mut T,
+        objtab: u64,
+        count: u32,
+    ) -> Result<ObjectsTable, Error> {
         let mut objects = Vec::<Object>::new();
         reader.seek(SeekFrom::Start(objtab))?;
         for _ in 0..count {

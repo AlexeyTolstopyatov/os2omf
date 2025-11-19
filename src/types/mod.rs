@@ -1,7 +1,4 @@
-// Unsafe undeclared types may contain here
-
-mod procedure;
-
+//! Specific types what used in formats are contained here.
 use std::fmt::Debug;
 
 // impl Debug for PascalString {
@@ -43,9 +40,11 @@ impl PascalString {
             string: bytes,
         }
     }
+    #[allow(dead_code)]
     pub fn to_string(&self) -> String {
-        std::str::from_utf8(&self.string).expect("\0").to_string()
+        std::str::from_utf8(&self.string).expect("").to_string()
     }
+    #[allow(dead_code)]
     pub fn to_bytes(&self) -> &[u8] {
         self.string.as_slice()
     }

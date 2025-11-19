@@ -4,7 +4,7 @@ use std::io;
 use std::io::{Error, Read, Seek, SeekFrom};
 #[derive(Debug)]
 pub struct ObjectPagesTable {
-    pub pages: Vec<ObjectPage>
+    pub pages: Vec<ObjectPage>,
 }
 #[derive(Debug)]
 pub enum ObjectPage {
@@ -13,7 +13,7 @@ pub enum ObjectPage {
 }
 
 #[repr(C)]
-#[derive(Debug,Clone, Copy, Pod, Zeroable)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
 pub struct LEObjectPageHeader {
     pub page_number: [u8; 3], // 24-bit page <-- \
     pub flags: u8,
@@ -29,7 +29,7 @@ pub struct LXObjectPageHeader {
 pub struct LXObjectPageData {
     pub data: Vec<u8>,
     pub flags: PageFlags,
-    pub number: u32
+    pub number: u32,
 }
 impl ObjectPagesTable {
     pub fn read<T: Read + Seek>(
@@ -38,7 +38,7 @@ impl ObjectPagesTable {
         pages_count: u32,
         pages_shift: u32,
         magic: u16,
-        ) -> io::Result<Self> {
+    ) -> io::Result<Self> {
         let mut pages = Vec::<ObjectPage>::with_capacity(pages_count as usize);
         reader.seek(SeekFrom::Start(obj_map))?;
         match magic {
@@ -46,12 +46,10 @@ impl ObjectPagesTable {
             exe386::header::LX_MAGIC => Self::fill_lx_pages(reader, &mut pages, pages_shift),
             exe386::header::LE_CIGAM => Self::fill_le_pages(reader, &mut pages, pages_count),
             exe386::header::LE_MAGIC => Self::fill_le_pages(reader, &mut pages, pages_count),
-            _ => unreachable!()
+            _ => unreachable!(),
         }
 
-        Ok(Self {
-            pages
-        })
+        Ok(Self { pages })
     }
     pub fn fill_lx_pages<T: Read>(reader: &mut T, pages: &mut Vec<ObjectPage>, pages_count: u32) {
         for _ in 0..pages_count {

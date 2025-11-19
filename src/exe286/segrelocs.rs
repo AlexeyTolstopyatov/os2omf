@@ -6,7 +6,7 @@ pub struct InternalFixes {
     // FAR pointer of relocation declares.
     pub int_seg: u8,
     pub int_mov: bool, // Is moveable?
-    pub int_offset: u16
+    pub int_offset: u16,
 }
 #[derive(Clone, Debug)]
 pub struct ImportOrdinal {
@@ -17,14 +17,14 @@ pub struct ImportOrdinal {
 #[derive(Clone, Debug)]
 pub struct ImportName {
     pub imp_mod: u16,
-    pub imp_offset: u16
+    pub imp_offset: u16,
 }
 #[derive(Clone, Debug)]
 pub struct FPUFixup {
     /// See FPUFixupType
     pub osf_type: FPUFixupType,
     /// unused space. Usually 0x0000
-    pub osf_padd: u16
+    pub osf_padd: u16,
 }
 ///
 /// This is a type of instruction what Windows
@@ -35,7 +35,7 @@ pub struct FPUFixup {
 ///
 #[derive(Clone, Debug)]
 #[repr(u16)] // <-- interpret it like
-             // public enum FpuFixupType : UInt16
+// public enum FpuFixupType : UInt16
 pub enum FPUFixupType {
     FiArqqFjArqq = 0x0001,
     FiSrqqFjSrqq = 0x0002,
@@ -47,23 +47,22 @@ pub enum FPUFixupType {
 impl FPUFixupType {
     // I can't implement "Pod" for enums.
     pub fn get_from(u: u16) -> FPUFixupType {
-        match u {  
+        match u {
             0x0001 => FPUFixupType::FiArqqFjArqq,
             0x0002 => FPUFixupType::FiSrqqFjSrqq,
             0x0003 => FPUFixupType::FiCrqqFjCrqq,
             0x0004 => FPUFixupType::FiErqq,
             0x0005 => FPUFixupType::FiDrqq,
-            _ => FPUFixupType::FiDrqq
+            _ => FPUFixupType::FiDrqq,
         }
     }
-    
 }
 #[derive(Debug, Clone)]
 pub enum RelocationType {
     Internal(InternalFixes),
     ImportName(ImportName),
     ImportOrdinal(ImportOrdinal),
-    OSFixup(FPUFixup)
+    OSFixup(FPUFixup),
 }
 ///
 /// Every relocation record in table of relocations
@@ -103,8 +102,8 @@ impl RelocationTable {
 
             let address_type = entry_buf[0];
             let reloc_flags = entry_buf[1];
-            let reloc_type = reloc_flags & 0x03;  // Lower 2 bits
-            let is_additive = (reloc_flags & 0x04) != 0;  // Bit 2
+            let reloc_type = reloc_flags & 0x03; // Lower 2 bits
+            let is_additive = (reloc_flags & 0x04) != 0; // Bit 2
             let segment_offset = u16::from_le_bytes([entry_buf[2], entry_buf[3]]);
 
             let target = match reloc_type {
@@ -117,7 +116,7 @@ impl RelocationTable {
                     let internal_fix: InternalFixes = InternalFixes {
                         int_seg: segment,
                         int_mov: is_movable,
-                        int_offset: offset_or_ordinal
+                        int_offset: offset_or_ordinal,
                     };
 
                     RelocationType::Internal(internal_fix)
@@ -161,8 +160,8 @@ impl RelocationTable {
                 _ => {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
-                        format!("invalid relocation type: 0x{:02X}", reloc_type)),
-                    );
+                        format!("invalid relocation type: 0x{:02X}", reloc_type),
+                    ));
                 }
             };
 
@@ -175,6 +174,8 @@ impl RelocationTable {
             });
         }
 
-        Ok(Self { rel_entries: entries })
+        Ok(Self {
+            rel_entries: entries,
+        })
     }
 }

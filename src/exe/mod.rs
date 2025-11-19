@@ -1,10 +1,11 @@
 mod reltab;
 
+use bytemuck::{Pod, Zeroable};
 use std::{
     io::{self, Read},
     u8,
 };
-use bytemuck::{Pod, Zeroable};
+use std::io::ErrorKind;
 
 pub const E_MAGIC: u16 = 0x5a4d;
 pub const E_CIGAM: u16 = 0x4d5a;
@@ -69,8 +70,13 @@ impl MzHeader {
         let mut buf = [0; 0x40];
         r.read_exact(&mut buf)?;
 
+        let header: MzHeader = bytemuck::cast(buf);
 
-        Ok(bytemuck::cast(buf))
+        if !header.has_valid_magic() {
+            return Err(io::Error::new(ErrorKind::InvalidData, "Invalid DOS header"))
+        }
+
+        Ok(header)
     }
     ///
     /// Tries check out signature of PC-DOS

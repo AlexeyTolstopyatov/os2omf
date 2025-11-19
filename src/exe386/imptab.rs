@@ -109,10 +109,15 @@ impl ImportRelocationsTable {
         ordinal_target: &crate::exe386::frectab::FixupTargetImportedOrdinal,
         modules: &[PascalString],
     ) -> Result<DllImport, Error> {
-        let module_index = ordinal_target.module_ordinal -1;
+        let module_index = ordinal_target.module_ordinal - 1;
         let module_name = modules
             .get(module_index as usize)
-            .ok_or_else(|| Error::new(ErrorKind::InvalidData, format!("Module at {} index is invalid", module_index)))?
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::InvalidData,
+                    format!("Module at {} index is invalid", module_index),
+                )
+            })?
             .clone();
 
         Ok(DllImport::ImportOrdinal(DllImportOrdinal {

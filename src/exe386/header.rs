@@ -1,6 +1,5 @@
 use bytemuck::{Pod, Zeroable};
 use std::io::{Error, ErrorKind, Read};
-use crate::{exe386, TargetObject};
 
 pub const LX_MAGIC: u16 = 0x584c;
 pub const LX_CIGAM: u16 = 0x4c58;
@@ -8,23 +7,21 @@ pub const LE_MAGIC: u16 = 0x455c;
 pub const LE_CIGAM: u16 = 0x4c45;
 ///
 /// Linear Executable format is undocumented format
-/// From Microsoft Windows and IBM OS/2 till eCOM Station and ArcaOS it was
+/// From Microsoft Windows and IBM/Microsoft OS/2 till eCOM Station and ArcaOS it was
 /// experimental format of program/modules linkage.
 ///
-/// ### LE - OS/2 2.0 and Windows VMM era
+/// ### LE - Microsoft OS/2 2.0 / Windows VMM
 ///
 /// > Those files mostly contains 16-32 bit code
 ///
-/// LE marked executables are "Linear Executables". Nobody knows
-/// what specification was first, so I feel - LE format was first.
 /// All drivers of Windows 3.x ".386" and Windows VMM drivers ".vxd"
-/// was LE linked. And OS/2 2.0+ DOSCA11S.DLL library module was LE linked.
+/// was LE linked. And OS/2 2.0+ library modules was LE linked. (Unlike of programs)
 /// They are contained 16-32 bit code in objects/segments.
 ///
-/// ### LX - OS/2 3.0+ Standard object format
+/// ### LX - IBM OS/2 2.0+ Standard object format
 ///
 /// > Those files are used in modern versions of OS/2 -> ArcaOS.
-/// > Mostly contains 32-bit code. But can be semi 32-bit too.
+/// > Mostly contains 32-bit code. But could contain 16-bit code/data objects.
 ///
 /// LX marked executables are "Linear eXecutables". (Open)Watcom
 /// compiler and linker uses this format as default for OS/2 OMFs
@@ -47,7 +44,10 @@ pub struct LinearExecutableHeader {
     pub e32_ss: u32,
     pub e32_esp: u32,
     pub e32_pagesize: u32,
-    pub e32_pageshift_or_lastpage: u32, // LX: page_shift | LE: last page size
+    /// Depends on target format:
+    ///  - `e32_page_shift` as u32 - LX linked project
+    ///  - `e32_cblp` (count bytes at last page) - LE linked project
+    pub e32_pageshift_or_lastpage: u32,
     pub e32_fixupsize: u32,
     pub e32_fixupsum: u32,
     pub e32_ldrsize: u32,
@@ -79,7 +79,8 @@ pub struct LinearExecutableHeader {
     pub e32_instpreload: u32,
     pub e32_instdemand: u32,
     pub e32_heapsize: u32,
-    pub e32_stacksize: u32, // LX | LE: reserved.
+    /// Available only for LX linked modules
+    pub e32_stacksize: u32,
     pub e32_res3: [u8; 8],
 }
 // Linear Compressed executable: I've seen in DOS32a extender
@@ -102,17 +103,16 @@ impl LinearExecutableHeader {
 
         let header: &LinearExecutableHeader = bytemuck::try_from_bytes(&buf)
             .map_err(|_| Error::new(ErrorKind::InvalidData, "Unable to cast bytes into header"))?;
+
+        if !header.has_valid_magic() {
+            return Err(Error::new(ErrorKind::InvalidData, format!("Invalid magic {:X}", header.e32_magic)));
+        }
+        
+        if !header.le_byte_ordering() {
+            return Err(Error::new(ErrorKind::InvalidData, "Only Little endian linked modules are supported!"))
+        }
         
         Ok(*header)
-    }
-    pub fn who_is_it(&self) -> TargetObject {
-        match self.e32_magic { 
-            LE_CIGAM => TargetObject::LEModule,
-            LE_MAGIC => TargetObject::LEModule,
-            LX_MAGIC => TargetObject::LXModule,
-            LX_CIGAM => TargetObject::LXModule,
-            _ => TargetObject::MZModule
-        }
     }
     pub fn external_relocs_stripped(&self) -> bool {
         self.e32_mflags & 0x00000020 != 0
@@ -125,8 +125,10 @@ impl LinearExecutableHeader {
     /// the file data will be applied
     ///
     /// In practice if internal relocations stripped -- module still
-    /// has fixup records table. But doesn't contain internal fixups.
-    ///
+    /// has fixup records table. But may not contain internal fixups.
+    /// But module with internal relocations (relocs_stripped flag not set)
+    /// always has internal relocations in `FixupRelocations` table
+    /// 
     pub fn internal_relocs_stripped(&self) -> bool {
         self.e32_mflags & 0x00000010 != 0
     }
@@ -146,7 +148,7 @@ impl LinearExecutableHeader {
         LinearExecutableType::EXE
     }
     ///
-    /// Be carefully: Only LE-ordered files are supported!
+    /// Be carefully: Only little endian-ordered files are supported!
     ///
     pub fn le_byte_ordering(&self) -> bool {
         if self.e32_border == 0 && self.e32_worder == 0 {
@@ -154,6 +156,8 @@ impl LinearExecutableHeader {
         }
         false
     }
+    /// Matches `e32_magic` with program-constants
+    /// declared higher in `exe386::header`
     pub fn has_valid_magic(&self) -> bool {
         match self.e32_magic {
             LX_MAGIC => true,
@@ -166,26 +170,27 @@ impl LinearExecutableHeader {
 }
 #[repr(u16)]
 pub enum CPU {
+    /// Intel 286 and higher
     I286 = 0x0001,
+    /// Intel 386 and higher
     I386 = 0x0002,
+    /// Intel 486 and higher
     I486 = 0x0003,
 }
 pub enum OS {
     Unknown = 0,
+    /// OS/2 2.0+
     Os2v2 = 0x0001,
+    /// Windows without 32-bit support
     Windows286 = 0x0002,
+    /// DOS 4.0+
     Dos4 = 0x0003,
+    /// Windows with support of 32-bit code execution
+    /// Be carefully: not `Win32s`. Win32 is a subsystem codename for Windows 3x
     Windows386 = 0x0004,
     PersonalityNeural = 0x0005,
 }
-pub struct LinearExecutableFlags {
-    flags: u32,
-    fmt_lvl: u32,
-    bo: u8,
-    wo: u8,
-    major_ver: u16,
-    minor_ver: u16,
-}
+/// Possible declared by IBM manual types of loadable modules
 #[repr(u32)]
 pub enum LinearExecutableType {
     /// Executable
@@ -199,29 +204,3 @@ pub enum LinearExecutableType {
     /// Dynamically linked Driver
     DLD = 0x00030000,
 }
-impl LinearExecutableFlags {
-    pub fn from(
-        flags: u32,
-        byte_order: u8,
-        word_order: u8,
-        fmt_lvl: u32,
-        ver: u32,
-    ) -> Self {
-        let major_ver = ver >> 16;
-        let minor_ver = ver & 0xffff;
-        Self {
-            flags,
-            bo: byte_order,
-            wo: word_order,
-            fmt_lvl,
-            major_ver: major_ver as u16,
-            minor_ver: minor_ver as u16,
-        }
-    }
-
-}
-//
-// Mostly reverse engineering of LE linked binaries bases
-// on the IBM documents about LX format. Therefore,
-// I'll base on last revision of "IBM Object Module | Format Linear eXecutable".pdf
-//

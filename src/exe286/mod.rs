@@ -4,7 +4,7 @@ use crate::exe286::header::NewExecutableHeader;
 use crate::exe286::modtab::ModuleReferencesTable;
 use crate::exe286::nrestab::NonResidentNameTable;
 use crate::exe286::resntab::ResidentNameTable;
-use crate::exe286::segtab::{Segment, ImportsTable};
+use crate::exe286::segtab::{ImportsTable, Segment};
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
@@ -15,18 +15,18 @@ pub const NE_MAGIC: u16 = 0x454e;
 pub const NE_CIGAM: u16 = 0x4e45;
 
 // connect modules "files" here
-pub mod header;
-pub mod modtab; 
-pub mod segtab;
-pub mod segrelocs;
 pub mod enttab;
+pub mod header;
+pub mod modtab;
 pub mod nrestab;
 pub mod resntab;
+pub mod segrelocs;
+pub mod segtab;
 /// ### Segmented New Executable Layout
 /// Every segmented OS/2-Windows executable is a book with specific data inside
 /// This book traditionally has table of content
 /// Main regions of this book is a segments like sections in PE32/+ or ELF32/64 files
-/// 
+///
 /// ```
 /// +----+---+--------+---------+
 /// | MZ |   |e_lfarlc|e_lfanew ------+
@@ -71,7 +71,7 @@ pub mod resntab;
 /// +---------------------------+
 /// |  NONRESIDENT NAMES TABLE  | Exporting functions which unused by module
 /// +---------------------------+
-/// 
+///
 /// ```
 pub(crate) struct NeExecutableLayout {
     pub dos_header: MzHeader,
@@ -97,43 +97,44 @@ impl NeExecutableLayout {
 
         let dos_header = MzHeader::read(&mut reader)?;
         if !dos_header.has_valid_magic() {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid magic for dos_header"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Not a valid DOS header",
+            ));
         }
 
         reader.seek(SeekFrom::Start(dos_header.e_lfanew as u64))?;
 
         if dos_header.e_lfanew == 0_u32 {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid e_lfanew for protected-mode executable"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Not protected mode executable",
+            ));
         }
 
-        let offset = |ptr: u16| {
-            ptr as u64 + dos_header.e_lfanew as u64
-        };
+        let offset = |ptr: u16| ptr as u64 + dos_header.e_lfanew as u64;
 
         let new_header = NewExecutableHeader::read(&mut reader, dos_header.e_lfanew)?;
-        if  !new_header.is_valid_magic() {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid magic for protected-mode executable"));
+        if !new_header.is_valid_magic() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Invalid magic for protected-mode executable",
+            ));
         }
         // Now we are extremely needed the e_lfanew just because
         // all pointers in Windows-OS/2 header are relative.
         // This is a chance to little compress data to NEAR pointers
-        let nres_tab = NonResidentNameTable::read(
-            &mut reader,
-            new_header.e_nres_tab
-        )?;
-        let resn_tab = ResidentNameTable::read(
-            &mut reader,
-            offset(new_header.e_resn_tab)
-        )?;
+        let nres_tab = NonResidentNameTable::read(&mut reader, new_header.e_nres_tab)?;
+        let resn_tab = ResidentNameTable::read(&mut reader, offset(new_header.e_resn_tab))?;
         let ent_table = EntryTable::read(
             &mut reader,
             offset(new_header.e_ent_tab),
-            new_header.e_cb_ent
+            new_header.e_cb_ent,
         )?;
         let mod_tab = ModuleReferencesTable::read(
             &mut reader,
             offset(new_header.e_mod_tab),
-            new_header.e_cmod
+            new_header.e_cmod,
         )?;
         let mut imp_list = Vec::<ImportsTable>::new();
         let mut segments = Vec::<Segment>::new();
@@ -151,7 +152,7 @@ impl NeExecutableLayout {
                 &s.relocs,
                 offset(new_header.e_imp_tab) as u32,
                 offset(new_header.e_mod_tab) as u32,
-                (i + 1) as i32
+                (i + 1) as i32,
             )?);
         }
 

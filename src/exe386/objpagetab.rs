@@ -1,8 +1,7 @@
-use crate::exe386;
+use crate::exe386::header::{LE_CIGAM, LE_MAGIC, LX_CIGAM, LX_MAGIC};
 use bytemuck::{Pod, Zeroable};
 use std::io;
 use std::io::{Error, Read, Seek, SeekFrom};
-use crate::exe386::header::{LE_CIGAM, LE_MAGIC, LX_CIGAM, LX_MAGIC};
 
 #[derive(Debug)]
 pub struct ObjectPagesTable {
@@ -43,14 +42,14 @@ impl ObjectPagesTable {
     ) -> io::Result<Self> {
         let mut pages = Vec::<ObjectPage>::with_capacity(pages_count as usize);
         reader.seek(SeekFrom::Start(obj_map))?;
-        
+
         if magic == LX_CIGAM || magic == LX_MAGIC {
             Self::fill_lx_pages(reader, &mut pages, pages_shift)
         };
         if magic == LE_MAGIC || magic == LE_CIGAM {
             Self::fill_le_pages(reader, &mut pages, pages_count)
         };
-        
+
         Ok(Self { pages })
     }
     pub fn fill_lx_pages<T: Read>(reader: &mut T, pages: &mut Vec<ObjectPage>, pages_count: u32) {

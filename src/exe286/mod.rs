@@ -1,3 +1,24 @@
+//! This module represents API for extracting all nested information
+//! from new segmented executable file. This format was a first format
+//! of Intel protected-mode executables. Microsoft made it pretty simple but impressive.
+//!
+//! All dynamic linking features and run-time imports are growing from here.
+//! Nested resources and windowing applications are growing from here too.
+//! All calling conventions and understandable of DOS API are growing from here too.
+//! And all of it was in 16-bit executables loaded in segmented memory.
+//!
+//! Files linked as NE executables are appearing in Windows 1.x till 3.x,
+//! IBM OS/2 1.x, multitasking MS-DOS 4.x, and other DOS editions.
+//! Let's extract all data and symbols from those files:
+//! ```rust
+//! use os2omf::exe286::NeExecutableLayout;
+//!
+//! let file_str = "put here Windows 3.1 app/dll path";
+//! let layout = NeExecutableLayout::get(file_str)?;
+//!
+//! ```
+//! That's all. `layout` contains all extracted and processed data
+//! of nested structures what follows by the header.
 use crate::exe::MzHeader;
 use crate::exe286::enttab::EntryTable;
 use crate::exe286::header::NewExecutableHeader;
@@ -74,7 +95,7 @@ pub mod segtab;
 ///
 /// ```
 
-pub(crate) struct NeExecutableLayout {
+pub struct NeExecutableLayout {
     pub dos_header: MzHeader,
     pub new_header: NewExecutableHeader,
     pub ent_tab: EntryTable,

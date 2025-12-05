@@ -1,5 +1,41 @@
-mod reltab;
-
+//! This module represents API for extracting information of IA-32 real-time programs
+//! written and linked for MS-DOS Windows OS/2 and other platforms which are having
+//! DOS trace.
+//! Programs what started with `MZ` were so close to hardware because
+//! MS-DOS 2.0...4.0 ran into IA-32 real-mode. In modern applications or libraries
+//! this called DOS header and following next real-mode application called "DOS Stub".
+//!
+//! Extracting information from DOS executable is easy task
+//! but not all knows what follows by the DOS header.
+//! ```rust
+//! use std::fs::File;
+//! use std::io::BufReader;
+//! use os2omf::exe::MzHeader;
+//! use os2omf::exe::reltab::RelocationRecordsTable;
+//! 
+//! let file_str = "<put here any exe filepath>";
+//! let file_io = File::open(file_str)?;
+//! let mut file_buf = BufReader::new(file_io);
+//!
+//! let dos_header = MzHeader::read(&mut file_buf)?;
+//! let dos_relocations = RelocationRecordsTable::read(&mut file_buf, &dos_header)?;
+//! ```    
+//! 
+//! If you look into filled MZ header of any Windows executable you will see
+//! once interesting thing: "`e_lfarlc` always set 0x40". This rule was since
+//! Windows 1.0 was released. Applications of Windows 1.x were already IA-32 protected-mode programs.
+//! 
+//! The rule which determines next protected-mode program location
+//! exists too, but I can't follow it. In practice, it would be better if you
+//! will agree with long jumps between DOS real-mode sections of data and code and
+//! protected-mode sections of data and code.
+//! If you see anomaly long jump at `e_lfanew` it may be
+//!  - DOS Extender's runtime instead of DOS stub (DOS4GW/DOS32a/Watcom);
+//!  - Windows386 self-executable archive (W3/W4);
+//!  - Invalid pointer.
+//! 
+//! Use this when you are deep dive into retro software.
+pub mod reltab;
 use bytemuck::{Pod, Zeroable};
 use std::{
     io::{self, Read},
@@ -13,13 +49,9 @@ pub const E_LFARLC: u16 = 0x40;
 ///
 /// Mark Zbikowski header of DOS programs
 ///
-/// transparent -> StructLayout=Explicit
-/// C           -> StructLayout=Sequential
-/// packed      -> Pack = 1
-///
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
-pub(crate) struct MzHeader {
+pub struct MzHeader {
     /// MZ Header signature
     pub e_magic: u16,
     /// Bytes on last page of file

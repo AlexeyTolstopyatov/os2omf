@@ -1,4 +1,46 @@
+//! This module represents API for reading **all nested tables** in linear executable.
+//! The "Linear eXecutable" is the IBM standard for OS/2 - ArcaOS operating systems.
+//! and "Linear Executable" is Microsoft next format of IA-32 protected mode applications.
+//! One negative side of it for us is a complexity of nested data in file.
+//! 
+//! Unlike segmented "New Executables" (see `exe286` module), those formats documented badly
+//! and most important structures for us will be non-linear and very difficult to understand
+//! them first time.
+//! 
+//! That's why `LinearExecutableLayout` structure exists.
+//! Our goal: "extract possible details of protected mode executable" becomes
+//! so minimal that our solution could be one-two string/s of code.
+//!
+//! ```rust
+//! use os2omf::exe386::{LinearExecutableLayout};
+//!
+//! let file_str = "<put here your flat_exec path>.DLL";
+//! let layout = LinearExecutableLayout::get(file_str);
+//! ``` 
+//! 
+//! Most important structures what holds the executable is `fixup records table`
+//! and objects data (`objects table`, `object pages`, `fixup pages`).
+//! Fixup tables tells us "what pointers needs to resolve in runtime?" and object
+//! pages holds data about executable code and data which will be loaded in memory.
+//! 
+//! Things what makes "WOW"-effect usually are prepared symbolic data. Extraction of symbolic data
+//! is not easy, therefore logic of this "WOW"-effect here it is.
+//! ```rust
+//! use os2omf::exe386::LinearExecutableLayout;
+//! 
+//! let file_str = "<put here your flat_exec path>.DLL";
+//! let layout = LinearExecutableLayout::get(file_str)?;
+//! 
+//! let exports = layout.entry_table.bundles;
+//! let resident_exports = layout.resident_names.entries; // <-- keep in memory while app is running
+//! let public_exports = layout.non_resident_names.entries; // <-- not.
+//! 
+//! let imports = layout.import_table.imports(); // names and ordinals of dynamic imports
+//! ```
+//!
 use crate::exe::MzHeader;
+use crate::exe286::nrestab::NonResidentNameTable;
+use crate::exe286::resntab::ResidentNameTable;
 use crate::exe386::dirtab::ModuleDirectivesTable;
 use crate::exe386::enttab::EntryTable;
 use crate::exe386::fpagetab::FixupPageTable;
@@ -22,7 +64,7 @@ pub mod objtab;
 pub mod resntab;
 pub mod vxd;
 
-pub(crate) struct LinearExecutableLayout {
+pub struct LinearExecutableLayout {
     pub header: LinearExecutableHeader,
     pub object_table: ObjectsTable,
     pub object_pages: ObjectPagesTable,
@@ -31,6 +73,8 @@ pub(crate) struct LinearExecutableLayout {
     //pub fixup_records_table: FixupRecordsTable,
     pub import_table: ImportRelocationsTable,
     pub module_directives_table: ModuleDirectivesTable,
+    pub non_resident_names: NonResidentNameTable,
+    pub resident_names: ResidentNameTable,
 }
 
 impl LinearExecutableLayout {
@@ -89,6 +133,14 @@ impl LinearExecutableLayout {
             &mut reader,
             offset(header.e32_enttab)
         )?;
+        let resident_names = ResidentNameTable::read(
+            &mut reader,
+            offset(header.e32_restab)
+        )?;
+        let non_resident_names = NonResidentNameTable::read(
+            &mut reader,
+            header.e32_nrestab
+        )?;
         let fixup_page_table = FixupPageTable::read(
             &mut reader,
             offset(header.e32_fpagetab),
@@ -124,6 +176,8 @@ impl LinearExecutableLayout {
             import_table,
             fixup_page_table,
             module_directives_table,
+            resident_names,
+            non_resident_names
         })
     }
 }

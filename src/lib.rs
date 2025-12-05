@@ -1,7 +1,7 @@
-mod exe;
-mod exe286;
-mod exe386;
-mod types;
+pub mod exe;
+pub mod exe286;
+pub mod exe386;
+pub mod types;
 
 pub enum ExecutableFormat {
     MZ,

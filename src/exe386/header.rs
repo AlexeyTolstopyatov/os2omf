@@ -1,3 +1,53 @@
+//! This module represents API for extracting common information
+//! from Linear (or FLAT) executable. All following data declared in `LinearExecutableHeader`
+//! and nested structures (pointers to structures) depends on this executable header position
+//!
+//! Traditionally IBM and Microsoft flat executables start from `IA-32` real-mode DOS part
+//! (means MZ header and following next real-mode application).
+//! That's why in current example we need to avoid MZ header and other details.
+//! Our goals:
+//!  - Skip PC(MS)-DOS header;
+//!  - Skip IA-32 application (or DOS stub);
+//!  - Get raw file pointer to IA-32 protected-mode exec header.
+//!  - Get all IA-32 protected-mode header. (expecting `LE` or `LX`)
+//! ```rust
+//! use std::fs::File;
+//! use std::io::{BufReader, Read, Seek, SeekFrom};
+//! use os2omf::exe386::header::LinearExecutableHeader;
+//!
+//! use std::ptr::read;
+//!
+//! const NEXT_SIGNATURE_PTR: u64 = 0x3C;
+//!
+//! let file_str = "<put here path to FLAT executable>";
+//! let file_io  = File::open(file_str)?;
+//! let mut file_buf = BufReader::new(file_io);
+//!
+//! file_buf.seek(SeekFrom::Start(NEXT_SIGNATURE_PTR))?; // move to e_lfanew
+//! let mut next_ptr_buffer = [0_u8; 4]; // e_lfanew is DWORD typed field
+//! file_buf.read_exact(&mut next_ptr_buffer)?;
+//!
+//!
+//! let next_ptr = u64::from_le_bytes(next_ptr_buffer);
+//! file_buf.seek(SeekFrom::Start(next_ptr))?;
+//!
+//! // finally!
+//! let exec_flat = LinearExecutableHeader::read(&mut file_buf)?;
+//!
+//! ```
+//!
+//! Now we've got the intel protected-mode FLAT header.
+//! This pretty simple and mandatory logic, but it demonstrates what we need to give
+//! for using this module's API.
+//!
+//! Sometimes you can find linked dynamic libraries or programs which
+//! don't have real-mode application part. (MZ structure is missing),
+//! but first file signature is LX.
+//! It makes our task easier. We can skip 2 points in list.
+//! Then our goals become
+//!  - Make sure this signature belongs to IBM FLAT executable.
+//!  - Read next whole following data.
+//!
 use bytemuck::{Pod, Zeroable};
 use std::io::{Error, ErrorKind, Read};
 
@@ -83,19 +133,7 @@ pub struct LinearExecutableHeader {
     pub e32_stacksize: u32,
     pub e32_res3: [u8; 8],
 }
-// Linear Compressed executable: I've seen in DOS32a extender
-// declares like this:
-// ```rust
-// pub struct LinearExecutable {
-//      e32_magic: u32,
-//      e32_objcnt: u8,
-//      e32_mflags: u8,
-//      e32_eip_num: u8,
-//      e32_esp_num: 8,
-//      e32_eip: u32,
-//      e32_esp: u32,
-// }
-// ```
+
 impl LinearExecutableHeader {
     pub fn read<T: Read>(r: &mut T) -> Result<Self, Error> {
         let mut buf = [0; 184]; // 184+12 = 200

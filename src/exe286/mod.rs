@@ -73,6 +73,7 @@ pub mod segtab;
 /// +---------------------------+
 ///
 /// ```
+
 pub(crate) struct NeExecutableLayout {
     pub dos_header: MzHeader,
     pub new_header: NewExecutableHeader,
@@ -82,15 +83,9 @@ pub(crate) struct NeExecutableLayout {
     pub resn_tab: ResidentNameTable,
     pub mod_tab: ModuleReferencesTable,
     pub imp_tab: Vec<ImportsTable>,
-
-    e_lfanew: u32,
 }
 
 impl NeExecutableLayout {
-    fn offset(&self, ptr: u16) -> u64 {
-        ptr as u64 + self.e_lfanew as u64
-    }
-
     pub fn get(path: &str) -> io::Result<Self> {
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);
@@ -165,8 +160,6 @@ impl NeExecutableLayout {
             seg_tab: segments,
             mod_tab,
             imp_tab: imp_list,
-
-            e_lfanew: dos_header.e_lfanew,
         };
 
         Ok(layout)

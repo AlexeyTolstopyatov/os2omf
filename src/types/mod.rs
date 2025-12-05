@@ -1,12 +1,5 @@
 //! Specific types what used in formats are contained here.
 use std::fmt::Debug;
-
-// impl Debug for PascalString {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-//         f.write_str(self.to_string().as_str())
-//     }
-// }
-
 ///
 /// ### Pascal String
 /// Type of ASCII string mostly used in Pascal.

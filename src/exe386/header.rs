@@ -1,10 +1,10 @@
 use bytemuck::{Pod, Zeroable};
 use std::io::{Error, ErrorKind, Read};
 
-pub const LX_MAGIC: u16 = 0x584c;
-pub const LX_CIGAM: u16 = 0x4c58;
-pub const LE_MAGIC: u16 = 0x455c;
-pub const LE_CIGAM: u16 = 0x4c45;
+pub const LX_MAGIC: u16 = 0x584C;
+pub const LX_CIGAM: u16 = 0x4C58;
+pub const LE_MAGIC: u16 = 0x455C;
+pub const LE_CIGAM: u16 = 0x4C45;
 ///
 /// Linear Executable format is undocumented format
 /// From Microsoft Windows and IBM/Microsoft OS/2 till eCOM Station and ArcaOS it was
@@ -28,7 +28,7 @@ pub const LE_CIGAM: u16 = 0x4c45;
 /// but DOS extenders are LE-linked.
 ///
 #[repr(C)]
-#[derive(Copy, Clone, PartialEq, Eq, Pod, Zeroable)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Pod, Zeroable)]
 pub struct LinearExecutableHeader {
     pub e32_magic: u16,
     pub e32_border: u8,
@@ -97,15 +97,15 @@ pub struct LinearExecutableHeader {
 // }
 // ```
 impl LinearExecutableHeader {
-    pub fn read<T: Read>(r: &mut T) -> Result<LinearExecutableHeader, Error> {
+    pub fn read<T: Read>(r: &mut T) -> Result<Self, Error> {
         let mut buf = [0; 184]; // 184+12 = 200
         r.read_exact(&mut buf)?;
 
         let header: &LinearExecutableHeader = bytemuck::try_from_bytes(&buf)
             .map_err(|_| Error::new(ErrorKind::InvalidData, "Unable to cast bytes into header"))?;
 
-        if !header.has_valid_magic() {
-            return Err(Error::new(ErrorKind::InvalidData, format!("Invalid magic {:X}", header.e32_magic)));
+        if header.invalid_magic() {
+            return Err(Error::new(ErrorKind::InvalidData, format!("Invalid magic 0x{:X}", header.e32_magic)));
         }
         
         if !header.le_byte_ordering() {
@@ -158,12 +158,10 @@ impl LinearExecutableHeader {
     }
     /// Matches `e32_magic` with program-constants
     /// declared higher in `exe386::header`
-    pub fn has_valid_magic(&self) -> bool {
+    pub fn invalid_magic(&self) -> bool {
         match self.e32_magic {
-            LX_MAGIC => true,
-            LX_CIGAM => true,
-            LE_MAGIC => true,
-            LE_CIGAM => true,
+            LX_MAGIC | LX_CIGAM => true,
+            LE_MAGIC | LE_CIGAM => true,
             _ => false,
         }
     }
@@ -186,7 +184,7 @@ pub enum OS {
     /// DOS 4.0+
     Dos4 = 0x0003,
     /// Windows with support of 32-bit code execution
-    /// Be carefully: not `Win32s`. Win32 is a subsystem codename for Windows 3x
+    /// Be carefully: not `Win32s`. Win32s is a "Win32-subsystem" codename for Windows 3x
     Windows386 = 0x0004,
     PersonalityNeural = 0x0005,
 }

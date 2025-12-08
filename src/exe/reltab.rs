@@ -4,7 +4,7 @@ use std::io;
 use std::io::{Read, Seek, SeekFrom};
 
 #[derive(Debug, Clone)]
-pub struct RelocationRecordsTable {
+pub struct MzRelocationTable {
     relocations: Vec<FarPointer>,
 }
 #[repr(C)]
@@ -13,7 +13,7 @@ pub struct FarPointer {
     pub segment: u16,
     pub offset: u16,
 }
-impl RelocationRecordsTable {
+impl MzRelocationTable {
     pub fn read<T: Read + Seek>(reader: &mut T, header: &MzHeader) -> io::Result<Self> {
         let mut relocations = Vec::<FarPointer>::new();
         reader.seek(SeekFrom::Start(header.e_lfarlc as u64))?;

@@ -3,47 +3,43 @@ pub mod exe286;
 pub mod exe386;
 pub mod types;
 
-pub enum ExecutableFormat {
-    MZ,
-    NE, // Windows/OS2 16-bit
-    LE, // Windows 3.x VxD
-    LX, // OS/2 32-bit
-}
-
-pub struct ExecutableInfo {
-    pub format: ExecutableFormat,
-    pub architecture: String,
-    pub entry_point: Option<u32>,
-    pub imports: Vec<Import>,
-    pub exports: Vec<Export>,
-    //pub segments: Vec<Segment>,
-    //pub resources: Vec<Resource>,
-}
-
-pub struct Import {
-    pub module_name: String,
-    pub function_name: Option<String>,
-    pub ordinal: Option<u16>,
-}
-
-pub struct Export {
-    pub name: String,
-    pub ordinal: u16,
-    pub address: u32,
-}
-
 #[cfg(test)]
-mod tests {
+mod exe_386_tests {
     use crate::exe386;
 
     #[test]
-    fn it_works() {
+    fn e386_header() {
         let path = "D:\\TEST\\MS_OS220\\DOSCALL1.DLL";
         let layout = exe386::LinearExecutableLayout::get(path);
 
         match layout {
-            Ok(res) => println!("{:?}", res.header),
-            Err(e) => eprint!("{:?}", e),
+            Ok(res) => assert!(true, "{:?}", res.header),
+            Err(e) => assert!(false, "{:?}", e),
+        }
+    }
+
+    #[test]
+    fn e386_enttab() {
+        let path = "D:\\TEST\\MS_OS220\\DOSCALL1.DLL";
+        let layout = exe386::LinearExecutableLayout::get(path);
+
+        match layout {
+            Ok(res) => {
+                assert!(true, "{:?}", res.entry_table.bundles);
+            },
+            Err(e) => assert!(false, "{:?}", e),
+        }
+    }
+    #[test]
+    fn e386_imports() {
+        let path = "D:\\TEST\\ARCA\\BDCALLS.DLL";
+        let layout = exe386::LinearExecutableLayout::get(path);
+
+        match layout {
+            Ok(res) => {
+                assert!(true, "{:?}", res.import_table.imports());
+            },
+            Err(e) => assert!(false, "{:?}", e),
         }
     }
 }

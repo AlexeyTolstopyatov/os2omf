@@ -77,7 +77,7 @@ impl EntryTable {
         reader.seek(SeekFrom::Start(enttab))?;
 
         loop {
-            let mut count_buf = [0u8];
+            let mut count_buf = [0_u8];
             reader.read_exact(&mut count_buf)?;
             let count = count_buf[0];
 
@@ -85,13 +85,13 @@ impl EntryTable {
                 break;
             }
 
-            let mut type_buf = [0u8];
+            let mut type_buf = [0_u8];
             reader.read_exact(&mut type_buf)?;
             let bundle_type = BundleType::from(type_buf[0]);
 
             let object =
                 if bundle_type != BundleType::Unused && bundle_type != BundleType::Forwarder {
-                    let mut obj_buf = [0u8; 2];
+                    let mut obj_buf = [0_u8; 2];
                     reader.read_exact(&mut obj_buf)?;
                     u16::from_le_bytes(obj_buf)
                 } else {

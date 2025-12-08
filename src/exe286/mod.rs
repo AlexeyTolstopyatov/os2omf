@@ -11,10 +11,10 @@
 //! IBM OS/2 1.x, multitasking MS-DOS 4.x, and other DOS editions.
 //! Let's extract all data and symbols from those files:
 //! ```rust
-//! use os2omf::exe286::NeExecutableLayout;
+//! use os2omf::exe286::NewExecutableLayout;
 //!
 //! let file_str = "put here Windows 3.1 app/dll path";
-//! let layout = NeExecutableLayout::get(file_str)?;
+//! let layout = NewExecutableLayout::get(file_str)?;
 //!
 //! ```
 //! That's all. `layout` contains all extracted and processed data
@@ -95,7 +95,7 @@ pub mod segtab;
 ///
 /// ```
 
-pub struct NeExecutableLayout {
+pub struct NewExecutableLayout {
     pub dos_header: MzHeader,
     pub new_header: NewExecutableHeader,
     pub ent_tab: EntryTable,
@@ -106,7 +106,7 @@ pub struct NeExecutableLayout {
     pub imp_tab: Vec<ImportsTable>,
 }
 
-impl NeExecutableLayout {
+impl NewExecutableLayout {
     pub fn get(path: &str) -> io::Result<Self> {
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);

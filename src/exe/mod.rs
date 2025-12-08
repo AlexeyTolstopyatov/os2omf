@@ -11,14 +11,14 @@
 //! use std::fs::File;
 //! use std::io::BufReader;
 //! use os2omf::exe::MzHeader;
-//! use os2omf::exe::reltab::RelocationRecordsTable;
-//! 
+//! use os2omf::exe::reltab::MzRelocationTable;
+//!
 //! let file_str = "<put here any exe filepath>";
 //! let file_io = File::open(file_str)?;
 //! let mut file_buf = BufReader::new(file_io);
 //!
 //! let dos_header = MzHeader::read(&mut file_buf)?;
-//! let dos_relocations = RelocationRecordsTable::read(&mut file_buf, &dos_header)?;
+//! let dos_relocations = MzRelocationTable::read(&mut file_buf, &dos_header)?;
 //! ```    
 //! 
 //! If you look into filled MZ header of any Windows executable you will see
@@ -36,16 +36,49 @@
 //! 
 //! Use this when you are deep dive into retro software.
 pub mod reltab;
+
+use crate::exe::reltab::MzRelocationTable;
 use bytemuck::{Pod, Zeroable};
-use std::{
-    io::{self, Read},
-    u8,
-};
-use std::io::ErrorKind;
+use std::fs::File;
+use std::io;
+use std::io::Read;
+use std::io::{BufReader, ErrorKind};
+use std::u8;
 
 pub const E_MAGIC: u16 = 0x5a4d;
 pub const E_CIGAM: u16 = 0x4d5a;
 pub const E_LFARLC: u16 = 0x40;
+
+pub struct MzExecutableLayout {
+    pub header: MzHeader,
+    pub relocs: MzRelocationTable
+}
+
+impl MzExecutableLayout {
+    pub fn get(file_name: &str) -> Result<Self, io::Error> {
+        let file = File::open(file_name)?;
+        let mut reader = BufReader::new(file);
+        let result_header = MzHeader::read(&mut reader);
+
+        let header = match result_header {
+            Ok(header) => header,
+            Err(e) => return Err(e)
+        };
+
+        let result_relocs = MzRelocationTable::read(&mut reader, &header);
+
+        let relocs = match result_relocs {
+            Ok(r) => r,
+            Err(e) => return Err(e)
+        };
+
+        Ok(Self {
+            header,
+            relocs
+        })
+    }
+}
+
 ///
 /// Mark Zbikowski header of DOS programs
 ///

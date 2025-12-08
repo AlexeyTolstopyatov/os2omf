@@ -10,10 +10,10 @@ pub enum ImportError {
 }
 
 #[derive(Debug, Clone)]
-pub struct ImportData {
+pub struct ImportData<'fixups_struct> {
     pub imp_mod_offset: u64,
     pub imp_proc_offset: u64,
-    pub fixup_records: Vec<FixupRecord>,
+    pub fixup_records: &'fixups_struct Vec<FixupRecord>,
 }
 
 #[derive(Debug, Clone)]

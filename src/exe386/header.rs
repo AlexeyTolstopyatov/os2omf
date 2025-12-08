@@ -142,7 +142,7 @@ impl LinearExecutableHeader {
         let header: &LinearExecutableHeader = bytemuck::try_from_bytes(&buf)
             .map_err(|_| Error::new(ErrorKind::InvalidData, "Unable to cast bytes into header"))?;
 
-        if header.invalid_magic() {
+        if !header.invalid_magic() {
             return Err(Error::new(ErrorKind::InvalidData, format!("Invalid magic 0x{:X}", header.e32_magic)));
         }
         

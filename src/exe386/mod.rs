@@ -70,7 +70,7 @@ pub struct LinearExecutableLayout {
     pub object_pages: ObjectPagesTable,
     pub entry_table: EntryTable,
     pub fixup_page_table: FixupPageTable,
-    //pub fixup_records_table: FixupRecordsTable,
+    pub fixup_records_table: FixupRecordsTable,
     pub import_table: ImportRelocationsTable,
     pub module_directives_table: ModuleDirectivesTable,
     pub non_resident_names: NonResidentNameTable,
@@ -83,8 +83,6 @@ impl LinearExecutableLayout {
     /// may not contain DOS compatibility (MZ header missing)
     /// Then first header instead of DOS header will be Linear Executable header
     /// and all relative pointers what set in header becomes absolute
-    ///
-    /// Returns
     ///
     fn define_base_offset<T: Read>(reader: &mut T) -> Option<u64> {
         let maybe_header = MzHeader::read(reader);
@@ -103,7 +101,9 @@ impl LinearExecutableLayout {
             Err(..) => None,
         }
     }
-
+    ///
+    /// Process all data of target executable module by path
+    ///
     pub fn get(path: &str) -> Result<Self, Error> {
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);
@@ -146,7 +146,7 @@ impl LinearExecutableLayout {
             offset(header.e32_fpagetab),
             &header
         )?;
-        let fixup_records = FixupRecordsTable::read(
+        let fixup_records_table = FixupRecordsTable::read(
             &mut reader,
             &fixup_page_table,
             offset(header.e32_frectab)
@@ -156,9 +156,10 @@ impl LinearExecutableLayout {
             ImportData {
                 imp_mod_offset: offset(header.e32_impmod),
                 imp_proc_offset: offset(header.e32_impproc),
-                fixup_records: fixup_records.records,
+                fixup_records: &fixup_records_table.records,
             },
         )?;
+
         let mut module_directives_table = ModuleDirectivesTable::empty();
         if header.e32_dirtab != 0 {
             module_directives_table = ModuleDirectivesTable::read(
@@ -175,6 +176,7 @@ impl LinearExecutableLayout {
             entry_table,
             import_table,
             fixup_page_table,
+            fixup_records_table,
             module_directives_table,
             resident_names,
             non_resident_names

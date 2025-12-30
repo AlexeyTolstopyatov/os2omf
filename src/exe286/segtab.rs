@@ -261,21 +261,21 @@ impl ImportsTable {
 /// Like a PE32/+ files, NE executable images has a table of something which
 /// contains raw code or data.
 /// ```
-///                                            |
-/// +--------+--------+-------+----------+ <---+ e_lfanew + e_segtab
-/// | offset | length | flags | minalloc |
-/// | 0xABCD | 0x0100 | 0x... | ...      |
-/// | 0xBOOC | 0x0020 | 0x007 | ...      |
-/// | ...    | ...    | ...   | ...      |
-///      |                 |
-///      |                 |
-///      |                 +-----> Based on flags and SEG_HASMASK (0x0007) byte
-///  Segments with offset = 0      defines the rules for each segment in table.
-///  are .BSS prototypes           flags & HASMASK = 1 -> .CODE16 segment
-///  because there's no iterated                     0 -> .DATA16 segment
-///  or compressed segments       (flags & PRELOAD) + (flags & HASMASK)
-///                                                 0 -> .DATA16  (read-write)
-///                                                 1 -> .RDATA16 (read-only)
+/// //                                            |
+/// // +--------+--------+-------+----------+ <---+ e_lfanew + e_segtab
+/// // | offset | length | flags | minalloc |
+/// // | 0xABCD | 0x0100 | 0x... | ...      |
+/// // | 0xBOOC | 0x0020 | 0x007 | ...      |
+/// // | ...    | ...    | ...   | ...      |
+/// //      |                 |
+/// //      |                 |
+/// //      |                 +-----> Based on flags and SEG_HASMASK (0x0007) byte
+/// //  Segments with offset = 0      defines the rules for each segment in table.
+/// //  are .BSS prototypes           flags & HASMASK = 1 -> .CODE16 segment
+/// //  because there's no iterated                     0 -> .DATA16 segment
+/// //  or compressed segments       (flags & PRELOAD) + (flags & HASMASK)
+/// //                                                 0 -> .DATA16  (read-write)
+/// //                                                 1 -> .RDATA16 (read-only)
 /// ```
 /// Every segment has a rights to contain own relocations table,
 /// because this way to imagine the segments table is most simple.

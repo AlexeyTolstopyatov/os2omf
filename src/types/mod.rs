@@ -7,12 +7,12 @@ use std::fmt::Debug;
 ///
 /// That's main difference between it and terminated C-Strings
 /// ```
-/// "pascal string" -> bytes[0] - 13
-///                    bytes[1] - 'p'
-///                    bytes[2] - 'a'
-///                    bytes[3] - 's'
-///                    ...
-///                    bytes[13] - 'g'
+/// // "pascal string" -> bytes[0] - 13
+/// //                    bytes[1] - 'p'
+/// //                    bytes[2] - 'a'
+/// //                    bytes[3] - 's'
+/// //                    ...
+/// //                    bytes[13] - 'g'
 /// ```
 ///
 #[allow(dead_code)]

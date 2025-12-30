@@ -31,23 +31,23 @@ impl Object {
         }
     }
 }
-const OBJ_READABLE: u16 =        0x0001;
-const OBJ_WRITEABLE: u16 =       0x0002;
-const OBJ_EXECUTABLE: u16 =      0x0004;
-const OBJ_RESOURCE: u16 =        0x0008;
-const OBJ_DISCARDABLE: u16 =     0x0010;
-const OBJ_SHARABLE: u16 =        0x0020;
-const OBJ_HAS_PRELOAD: u16 =     0x0040;
-const OBJ_HAS_INVALID: u16 =     0x0080;
-const OBJ_PERM_SWAPPABLE: u16 =  0x0100;  /* LE */
-const OBJ_HAS_ZERO_FILL: u16 =   0x0100;  /* LX */
-const OBJ_PERM_RESIDENT: u16 =   0x0200;
-const OBJ_PERM_CONTIGUOUS: u16 = 0x0300;  /* LX */
-const OBJ_PERM_LOCKABLE: u16 =   0x0400;
-const OBJ_ALIAS_REQUIRED: u16 =  0x1000;
-const OBJ_BIG: u16 =             0x2000;
-const OBJ_CONFORMING: u16 =      0x4000;
-const OBJ_IOPL: u16 =            0x8000;
+pub const OBJ_READABLE: u16 =        0x0001;
+pub const OBJ_WRITEABLE: u16 =       0x0002;
+pub const OBJ_EXECUTABLE: u16 =      0x0004;
+pub const OBJ_RESOURCE: u16 =        0x0008;
+pub const OBJ_DISCARDABLE: u16 =     0x0010;
+pub const OBJ_SHARABLE: u16 =        0x0020;
+pub const OBJ_HAS_PRELOAD: u16 =     0x0040;
+pub const OBJ_HAS_INVALID: u16 =     0x0080;
+pub const OBJ_PERM_SWAPPABLE: u16 =  0x0100;  /* LE */
+pub const OBJ_HAS_ZERO_FILL: u16 =   0x0100;  /* LX */
+pub const OBJ_PERM_RESIDENT: u16 =   0x0200;
+pub const OBJ_PERM_CONTIGUOUS: u16 = 0x0300;  /* LX */
+pub const OBJ_PERM_LOCKABLE: u16 =   0x0400;
+pub const OBJ_ALIAS_REQUIRED: u16 =  0x1000;
+pub const OBJ_BIG: u16 =             0x2000;
+pub const OBJ_CONFORMING: u16 =      0x4000;
+pub const OBJ_IOPL: u16 =            0x8000;
 pub enum LXObjectRights {
     /// Rights of "code32" section
     ///  - READ

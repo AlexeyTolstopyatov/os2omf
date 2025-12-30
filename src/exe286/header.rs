@@ -1,4 +1,3 @@
-//!
 use bytemuck::{Pod, Zeroable};
 use std::io::{self, Read, Seek, SeekFrom};
 
@@ -60,6 +59,20 @@ impl CPU {
         }
     }
 }
+pub enum OS {
+    /// None or Any
+    Unknown = 0,
+    /// OS/2 1x versions and usage of I286 instructions
+    Os2 = 1,
+    /// Windows 1.x-3x and usage of I286 instructions
+    Windows286 = 2,
+    /// European MS-DOS 4.0
+    /// (in different words: Multitasking MS-DOS)
+    Dos4 = 3,
+    /// Windows 1.x-3x and usage of I386 instructions
+    Windows386 = 4
+}
+
 ///
 /// Interface of New Executable header
 ///
@@ -85,7 +98,25 @@ impl NewExecutableHeader {
             library_module: self.e_flags & 0x0002 != 0,
             protected_mode_only: self.e_flags & 0x0008 != 0,
             data_segment: DataSegment::from(self.e_flags),
-            app_flags: ModuleWindowing::from(self.e_flags),
+            non_conforming: self.e_flag_others & 0x0040 != 0,
+            image_error: self.e_flag_others & 0x0020 != 0,
+        }
+    }
+
+    pub fn other_os2_flags(&self) -> ModuleOs2Flags {
+        ModuleOs2Flags {
+            long_names_support: self.e_flag_others & 0x0001 != 0,
+            os2_protected_mode: self.e_flag_others & 0x0002 != 0,
+            proportional_fonts: self.e_flag_others & 0x0004 != 0,
+            gangload_area: self.e_flag_others & 0x0008 != 0,
+        }
+    }
+
+    pub fn other_windows_flags(&self) -> ModuleWindowsFlags {
+        ModuleWindowsFlags {
+            win3x_protected_mode: self.e_flag_others & 0x0002 != 0,
+            proportional_fonts: self.e_flag_others & 0x0004 != 0,
+            fastload_area: self.e_flag_others & 0x0008 != 0,
         }
     }
 }
@@ -113,15 +144,35 @@ impl NewExecutableHeader {
 ///
 #[derive(Debug, Clone)]
 pub struct ModuleFlags {
-    /// 
-    library_module: bool,
-    data_segment: DataSegment,
-    app_flags: ModuleWindowing,
-    linkage_errors: bool,
-    protected_mode_only: bool,
+    /// Library module.
+    ///  - The `SS:SP` information is invalid,
+    ///  - The `CS:IP` points to an initialization procedure that is called
+    /// with `AX` register equal to the module handle.
+    ///  - DS is set to the library's data segment if the
+    /// SINGLEDATA flag is set. otherwise, DS is set
+    /// to the caller's data segment.
+    ///
+    /// The initialization procedure must perform a `FAR`-return to the caller,
+    /// with `AX` _not equal to zero to indicate success_, or `AX` _equal to zero
+    /// to indicate failure to initialize._
+    ///
+    /// A program or DLL can only contain dynamic links to executable files
+    /// that have this library module flag set. one program cannot dynamic-link to another program.
+    pub library_module: bool,
+    /// `.DATA` segment kind of the target
+    pub data_segment: DataSegment,
+    /// Errors in image (maybe some of the structures might be corrupted)
+    pub image_error: bool,
+    /// Intel specific value: see "NonConforming image x86"
+    pub non_conforming: bool,
+    /// Errors detected at link time, module will not load.
+    pub linkage_errors: bool,
+    /// This flag set if it would be better to run module at `i286` and higher
+    /// (this flag not belongs to OS/2)
+    pub protected_mode_only: bool,
 }
 #[derive(Debug, Clone)]
-enum DataSegment {
+pub enum DataSegment {
     /// Data segment is missing
     No = 0x0000,
     /// Shared among processes (application instances)
@@ -129,27 +180,6 @@ enum DataSegment {
     /// For each application instances will be made
     /// new data segment.
     Multiple = 0x0002,
-}
-#[derive(Debug, Clone)]
-enum ModuleWindowing {
-    /// Module doesn't use Windows PM API
-    None = 0x0000,
-    /// Application runs in "full-screen" mode
-    FullScreen = 0x0010,
-    /// Application could run with Windows PM API
-    CompatWinAPI = 0x0020,
-    /// Application requires installed Windows PM API
-    UseWinAPI = 0x0030,
-}
-impl ModuleWindowing {
-    pub fn from(f: u16) -> Self {
-        match f & 0x00FF {
-            0x0001 => ModuleWindowing::FullScreen,
-            0x0002 => ModuleWindowing::CompatWinAPI,
-            0x0003 => ModuleWindowing::UseWinAPI,
-            _ => ModuleWindowing::None,
-        }
-    }
 }
 impl DataSegment {
     pub fn from(f: u16) -> Self {
@@ -159,4 +189,30 @@ impl DataSegment {
             _ => DataSegment::No,
         }
     }
+}
+///
+/// If application runs under OS/2 1.x versions
+/// The field `e_flagothers` defines like this byte-mask
+///
+/// I'm not sure how the Win-OS/2 subsystem works with it,
+/// but Windows 3.10 defines this field different. (see [ModuleWindowsFlags])
+///
+/// It would be better if `e_flagothers` byte-mask reinterprets like this structure
+/// in the [OS::Os2] case.
+///
+pub struct ModuleOs2Flags {
+    pub os2_protected_mode: bool,
+    pub proportional_fonts: bool,
+    pub long_names_support: bool,
+    pub gangload_area: bool
+}
+///
+/// If application marked as [OS::Windows286] or [OS::Windows386]
+/// We can reinterpret `e_flagothers` byte-mask like this.
+///
+/// This list of flags came with Windows 3.10 SDK.
+pub struct ModuleWindowsFlags {
+    pub win3x_protected_mode: bool,
+    pub proportional_fonts: bool,
+    pub fastload_area: bool,
 }

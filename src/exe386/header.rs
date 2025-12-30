@@ -257,7 +257,7 @@ pub enum OS {
 #[derive(Debug, Clone)]
 pub struct ModuleFlags {
     /// External fixups *has been applied*
-    external_fixups: bool,
+    pub external_fixups: bool,
     /// Internal fixups *has been applied*
     ///
     /// The setting of this bit in a Linear Executable Module indicates that each
@@ -265,31 +265,31 @@ pub struct ModuleFlags {
     /// Table Reloc Base Addr. If the module's objects can not be loaded at these
     /// preferred addresses, then the relocation records that have been retained in
     /// the file data will be applied.
-    internal_fixups: bool,
+    pub internal_fixups: bool,
     /// Module could run with `start /PM` (inside OS/2)
-    pm_windowing_compat: bool,
+    pub pm_windowing_compat: bool,
     /// Module couldn't run with `start /PM`
-    pm_windowing_incompat: bool,
+    pub pm_windowing_incompat: bool,
     /// Module uses Presentation Manager API (`PM.DLL` `SOM.DLL`, ...)
     /// Also runs through `start /PM` key
-    pm_windowing_use: bool,
+    pub pm_windowing_use: bool,
     /// When the "Module is not loadable" flag is set, it indicates that either errors
     /// were detected at link time or that the module is being incrementally linked
     /// and therefore can't be loaded.
-    not_loadable: bool,
+    pub not_loadable: bool,
     /// The program module is multiple-processor unsafe. It does not provide the
     /// necessary serialization to run on more than one CPU at a time
-    multi_cpu_unsafe: bool,
+    pub multi_cpu_unsafe: bool,
     /// The setting of this bit requires the EIP Object # and EIP fields to have
     /// valid values. If the EIP Object # and EIP fields are valid and this bit is
     /// NOT set, then Global Library Termination is assumed. Setting this bit for
     /// an EXE file is invalid.
-    per_process_term: bool,
+    pub per_process_term: bool,
     /// The setting of this bit requires the EIP Object # and EIP fields to have
     /// valid values. If the EIP Object # and EIP fields are valid and this bit is
     /// NOT set, then Global Library Initialization is assumed. Setting this bit for
     /// an EXE file is invalid.
-    per_process_init: bool,
+    pub per_process_init: bool,
 }
 /// Possible declared by IBM manual types of loadable modules
 #[derive(Debug, Clone)]

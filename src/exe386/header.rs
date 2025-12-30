@@ -5,11 +5,13 @@
 //! Traditionally IBM and Microsoft flat executables start from `IA-32` real-mode DOS part
 //! (means MZ header and following next real-mode application).
 //! That's why in current example we need to avoid MZ header and other details.
+//!
 //! Our goals:
 //!  - Skip PC(MS)-DOS header;
-//!  - Skip IA-32 application (or DOS stub);
+//!  - Skip DOS application (or DOS stub);
 //!  - Get raw file pointer to IA-32 protected-mode exec header.
 //!  - Get all IA-32 protected-mode header. (expecting `LE` or `LX`)
+//!
 //! ```rust
 //! use std::fs::File;
 //! use std::io::{BufReader, Read, Seek, SeekFrom};
@@ -77,8 +79,15 @@ pub const LE_CIGAM: u16 = 0x4C45;
 /// compiler and linker uses this format as default for OS/2 OMFs
 /// but DOS extenders are LE-linked.
 ///
+/// Differences between `LE` and `LX` objects:
+///  - Header fields: `last_page_size` instead `page_shift` at the same position
+///  - Object page format: 32-bit record instead 64-bit record
+///  - Object record: flags byte-mask contain removed values (OBJ_SWAPPABLE was removed in LX)
+///
+/// Most of reverse-engineering materials about IBM OS/2 OMFs could have been applied
+/// to Microsoft OS/2 `LE` objects.
 #[repr(C)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Pod, Zeroable)]
+#[derive(Debug, Copy, Clone, PartialEq, Pod, Zeroable)]
 pub struct LinearExecutableHeader {
     pub e32_magic: u16,
     pub e32_border: u8,
@@ -96,7 +105,7 @@ pub struct LinearExecutableHeader {
     pub e32_pagesize: u32,
     /// Depends on target format:
     ///  - `e32_page_shift` as u32 - LX linked project
-    ///  - `e32_cblp` (count bytes at last page) - LE linked project
+    ///  - `e32_lastpage_size` (count bytes at last page) - LE linked project
     pub e32_pageshift_or_lastpage: u32,
     pub e32_fixupsize: u32,
     pub e32_fixupsum: u32,
@@ -170,20 +179,33 @@ impl LinearExecutableHeader {
     pub fn internal_relocs_stripped(&self) -> bool {
         self.e32_mflags & 0x00000010 != 0
     }
-    pub fn module_type(&self) -> LinearExecutableType {
+    pub fn module_type(&self) -> ModuleType {
         if self.e32_mflags & 0x00008000 != 0 {
-            return LinearExecutableType::DLL;
+            return ModuleType::DLL;
         }
         if self.e32_mflags & 0x00020000 != 0 {
-            return LinearExecutableType::PDD;
+            return ModuleType::PDD;
         }
         if self.e32_mflags & 0x00028000 != 0 {
-            return LinearExecutableType::VDD;
+            return ModuleType::VDD;
         }
         if self.e32_mflags & 0x00030000 != 0 {
-            return LinearExecutableType::DLD;
+            return ModuleType::DLD;
         }
-        LinearExecutableType::EXE
+        ModuleType::EXE
+    }
+    pub fn module_flags(&self) -> ModuleFlags {
+        ModuleFlags {
+            internal_fixups: self.e32_mflags & 0x00000010 != 0,
+            external_fixups: self.e32_mflags & 0x00000020 != 0,
+            multi_cpu_unsafe: self.e32_mflags & 0x00080000 != 0,
+            per_process_term: self.e32_mflags & 0x40000000 != 0,
+            per_process_init: self.e32_mflags & 0x00000004 != 0,
+            pm_windowing_incompat: self.e32_mflags & 0x00000100 != 0,
+            pm_windowing_compat: self.e32_mflags & 0x00000200 != 0,
+            pm_windowing_use: self.e32_mflags & 0x00000300 != 0,
+            not_loadable: self.e32_mflags & 0x00002000 != 0,
+        }
     }
     ///
     /// Be carefully: Only little endian-ordered files are supported!
@@ -204,6 +226,7 @@ impl LinearExecutableHeader {
         }
     }
 }
+#[derive(Debug, Clone)]
 #[repr(u16)]
 pub enum CPU {
     /// Intel 286 and higher
@@ -213,7 +236,9 @@ pub enum CPU {
     /// Intel 486 and higher
     I486 = 0x0003,
 }
+#[derive(Debug, Clone)]
 pub enum OS {
+    /// Flag not set: any OS supported or nothing at all.
     Unknown = 0,
     /// OS/2 2.0+
     Os2v2 = 0x0001,
@@ -222,14 +247,58 @@ pub enum OS {
     /// DOS 4.0+
     Dos4 = 0x0003,
     /// Windows with support of 32-bit code execution
-    /// Be carefully: not `Win32s`. Win32s is a "Win32-subsystem" codename for Windows 3x
+    ///
+    /// Be carefully: `Win386` is not `Win32s`. Win32s is a subsystem
+    /// of Windows COFF/PE 32-bit executables for 16-bit Windows 3x.
     Windows386 = 0x0004,
+    /// I can't find any information about it
     PersonalityNeural = 0x0005,
 }
+#[derive(Debug, Clone)]
+pub struct ModuleFlags {
+    /// External fixups *has been applied*
+    external_fixups: bool,
+    /// Internal fixups *has been applied*
+    ///
+    /// The setting of this bit in a Linear Executable Module indicates that each
+    /// object of the module has a preferred load address specified in the Object
+    /// Table Reloc Base Addr. If the module's objects can not be loaded at these
+    /// preferred addresses, then the relocation records that have been retained in
+    /// the file data will be applied.
+    internal_fixups: bool,
+    /// Module could run with `start /PM` (inside OS/2)
+    pm_windowing_compat: bool,
+    /// Module couldn't run with `start /PM`
+    pm_windowing_incompat: bool,
+    /// Module uses Presentation Manager API (`PM.DLL` `SOM.DLL`, ...)
+    /// Also runs through `start /PM` key
+    pm_windowing_use: bool,
+    /// When the "Module is not loadable" flag is set, it indicates that either errors
+    /// were detected at link time or that the module is being incrementally linked
+    /// and therefore can't be loaded.
+    not_loadable: bool,
+    /// The program module is multiple-processor unsafe. It does not provide the
+    /// necessary serialization to run on more than one CPU at a time
+    multi_cpu_unsafe: bool,
+    /// The setting of this bit requires the EIP Object # and EIP fields to have
+    /// valid values. If the EIP Object # and EIP fields are valid and this bit is
+    /// NOT set, then Global Library Termination is assumed. Setting this bit for
+    /// an EXE file is invalid.
+    per_process_term: bool,
+    /// The setting of this bit requires the EIP Object # and EIP fields to have
+    /// valid values. If the EIP Object # and EIP fields are valid and this bit is
+    /// NOT set, then Global Library Initialization is assumed. Setting this bit for
+    /// an EXE file is invalid.
+    per_process_init: bool,
+}
 /// Possible declared by IBM manual types of loadable modules
+#[derive(Debug, Clone)]
 #[repr(u32)]
-pub enum LinearExecutableType {
+pub enum ModuleType {
     /// Executable
+    ///
+    /// Module can't contain dynamic links
+    /// if this flag applied.
     EXE = 0x00000000,
     /// Dynamically linked library
     DLL = 0x00008000,
@@ -237,6 +306,6 @@ pub enum LinearExecutableType {
     PDD = 0x00020000,
     /// Virtual Device Driver
     VDD = 0x00028000,
-    /// Dynamically linked Driver
+    /// Dynamically linked Virtual Device Driver
     DLD = 0x00030000,
 }

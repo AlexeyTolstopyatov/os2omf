@@ -1,22 +1,36 @@
+//! This module represents generics of per-segment relocations
+//! New Executable format defines four types of per-segment relocation
+//!  - Internal
+//!  - Run-time Import by name
+//!  - Run-time Import by index (ordinal)
+//!  - FPU fixup
+//! 
+//! Internal fixup is a far-pointer (pointer to another segment) which
+//! applies to struct/procedure or any entry.
+//! 
+//! Records which contains information about imports are stores pointers
+//! to procedure call and procedure symbol. 
+//! 
+//! FPU fixups are instructions what Windows
+//! wants to "fix-up" while application runs
 use std::io;
 use std::io::Read;
 
 #[derive(Debug, Clone)]
-pub struct InternalFixes {
-    // FAR pointer of relocation declares.
+pub struct InternalFixup {
     pub int_seg: u8,
-    pub int_mov: bool, // Is moveable?
+    /// Is moveable?
+    pub int_mov: bool,
     pub int_offset: u16,
 }
 #[derive(Clone, Debug)]
 pub struct ImportOrdinal {
-    /// Module index into ModuleReferences Table
     pub imp_mod_index: u16,
     pub imp_ordinal: u16,
 }
 #[derive(Clone, Debug)]
 pub struct ImportName {
-    pub imp_mod: u16,
+    pub imp_mod_index: u16,
     pub imp_offset: u16,
 }
 #[derive(Clone, Debug)]
@@ -34,8 +48,7 @@ pub struct FPUFixup {
 /// command/opcode sequence
 ///
 #[derive(Clone, Debug)]
-#[repr(u16)] // <-- interpret it like
-// public enum FpuFixupType : UInt16
+#[repr(u16)]
 pub enum FPUFixupType {
     FiArqqFjArqq = 0x0001,
     FiSrqqFjSrqq = 0x0002,
@@ -45,8 +58,7 @@ pub enum FPUFixupType {
     FiWrqq = 0x0006,
 }
 impl FPUFixupType {
-    // I can't implement "Pod" for enums.
-    pub fn get_from(u: u16) -> FPUFixupType {
+     pub fn get_from(u: u16) -> FPUFixupType {
         match u {
             0x0001 => FPUFixupType::FiArqqFjArqq,
             0x0002 => FPUFixupType::FiSrqqFjSrqq,
@@ -59,7 +71,7 @@ impl FPUFixupType {
 }
 #[derive(Debug, Clone)]
 pub enum RelocationType {
-    Internal(InternalFixes),
+    Internal(InternalFixup),
     ImportName(ImportName),
     ImportOrdinal(ImportOrdinal),
     OSFixup(FPUFixup),
@@ -113,7 +125,7 @@ impl RelocationTable {
                     let is_movable = segment == 0xFF;
                     let offset_or_ordinal = u16::from_le_bytes([entry_buf[6], entry_buf[7]]);
 
-                    let internal_fix: InternalFixes = InternalFixes {
+                    let internal_fix: InternalFixup = InternalFixup {
                         int_seg: segment,
                         int_mov: is_movable,
                         int_offset: offset_or_ordinal,
@@ -139,7 +151,7 @@ impl RelocationTable {
                     let name_offset = u16::from_le_bytes([entry_buf[6], entry_buf[7]]);
 
                     let import_by_name = ImportName {
-                        imp_mod: module_index,
+                        imp_mod_index: module_index,
                         imp_offset: name_offset,
                     };
 

@@ -20,7 +20,7 @@ impl NonResidentNameEntry {
         }
         let name = {
             let mut name = vec![0; len as usize];
-            r.read_exact(&mut name)?;
+            r.read_exact(name.as_mut_slice())?;
             name
         };
         let index = {

@@ -43,7 +43,6 @@ use std::fs::File;
 use std::io;
 use std::io::Read;
 use std::io::{BufReader, ErrorKind};
-use std::u8;
 
 pub const E_MAGIC: u16 = 0x5a4d;
 pub const E_CIGAM: u16 = 0x4d5a;

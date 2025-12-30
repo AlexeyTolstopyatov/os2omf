@@ -1,8 +1,7 @@
 use bytemuck::{Pod, Zeroable};
 ///
-/// Windows Virtual xxx Drivers appears in traditional
-/// understanding appears in Windows 3x (NOT Windows 1.x)
-/// and was a dangerous objects of OS.
+/// Windows Virtual xxx Drivers appears in Windows 3x (NOT Windows 1.x)
+/// and were a dangerous objects of OS.
 ///
 /// MS-DOS Mz-executables was an applications what runs
 /// in IA-32 real-mode and strongly requires physical devices
@@ -13,7 +12,7 @@ use bytemuck::{Pod, Zeroable};
 /// to VMM. Only VMM has rights to call physical devices.
 ///  
 #[repr(C, packed(1))]
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Pod, Zeroable)]
+#[derive(Copy, Clone, PartialEq, Debug, Pod, Zeroable)]
 pub struct VxDHeader {
     pub e32_win_rsrc_offset: u32,
     pub e32_win_rsrc_size: u32,
@@ -35,7 +34,7 @@ pub struct VxDHeader {
 /// resources. Pointer to the structure will be NULL (0).
 ///
 #[repr(C, packed(1))]
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Pod, Zeroable)]
+#[derive(Copy, Clone, PartialEq, Debug, Pod, Zeroable)]
 pub struct VxDRsrcHeader {
     pub rsrc_type: u8,
     pub rsrc_name: u8,

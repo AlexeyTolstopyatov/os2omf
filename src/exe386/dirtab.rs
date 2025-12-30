@@ -25,8 +25,8 @@ pub enum DirectiveType {
     ThreadStateInit,
     Unknown(u16),
 }
-impl From<u16> for DirectiveType {
-    fn from(value: u16) -> Self {
+impl DirectiveType {
+    pub fn from(value: u16) -> Self {
         match value {
             0x8001 => DirectiveType::VerifyRecord,
             0x0002 => DirectiveType::LanguageInfo,
@@ -58,7 +58,7 @@ pub struct ObjectVerification {
 }
 
 pub struct ModuleDirectivesTable {
-    directives: Vec<ModuleDirective>,
+    pub directives: Vec<ModuleDirective>,
 }
 
 impl ModuleDirectivesTable {
@@ -82,13 +82,13 @@ impl ModuleDirectivesTable {
 
         let mut directives = Vec::with_capacity(header.e32_impmodcnt as usize);
         for _ in 0..header.e32_impmodcnt {
-            let mut entry_buf = [0u8; 8];
+            let mut entry_buf = [0_u8; 8];
             reader.read_exact(&mut entry_buf)?;
             let entry: ModuleDirectiveRecord = bytemuck::pod_read_unaligned(&entry_buf);
 
             // Directive data
             let directive_type = DirectiveType::from(entry.directive_number);
-            let mut data = vec![0u8; entry.data_length as usize];
+            let mut data = vec![0_u8; entry.data_length as usize];
 
             let data_offset = if entry.directive_number & 0x8000 != 0 {
                 // Resident table - offset from header
@@ -100,7 +100,7 @@ impl ModuleDirectivesTable {
 
             let current_pos = reader.stream_position()?;
             reader.seek(SeekFrom::Start(data_offset))?;
-            reader.read_exact(&mut data)?;
+            reader.read_exact(data.as_mut_slice())?;
             reader.seek(SeekFrom::Start(current_pos))?;
 
             directives.push(ModuleDirective {

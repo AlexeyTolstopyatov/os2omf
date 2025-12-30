@@ -1,2 +1,2 @@
-// Import Modules table parsing is redundant
+//! Import Modules table parsing is redundant
 

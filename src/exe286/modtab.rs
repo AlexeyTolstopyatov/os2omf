@@ -1,4 +1,7 @@
-use std::io::{self, Read};
+//! This module represents structure and methods of module-references 
+//! Module references table stores relative pointers to .EXE/.DLL module
+//! names. Imports table contains not only importing modules.
+use std::io::{self, Read, Seek, SeekFrom};
 ///
 /// Module References Table
 /// Represents WORD records array where count of records defines
@@ -22,7 +25,9 @@ pub struct ModuleReferencesTable {
 }
 
 impl ModuleReferencesTable {
-    pub fn read<TRead: Read>(reader: &mut TRead, e_modtab: u64, cmod: u16) -> io::Result<Self> {
+    pub fn read<TRead: Read + Seek>(reader: &mut TRead, e_modtab: u64, cmod: u16) -> io::Result<Self> {
+        reader.seek(SeekFrom::Start(e_modtab))?;
+        
         let mut references: Vec<u16> = Vec::<u16>::new();
         let mut buf: [u8; 2] = [0, 0];
 

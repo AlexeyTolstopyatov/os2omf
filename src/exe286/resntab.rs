@@ -1,3 +1,4 @@
+//! This module represents methods for extract resident names from file
 use crate::types::PascalString;
 use std::io::{self, Read, Seek, SeekFrom};
 

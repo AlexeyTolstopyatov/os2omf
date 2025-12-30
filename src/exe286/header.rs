@@ -1,3 +1,4 @@
+//!
 use bytemuck::{Pod, Zeroable};
 use std::io::{self, Read, Seek, SeekFrom};
 
@@ -6,7 +7,7 @@ use crate::exe286;
 ///
 /// OS/2 & Windows file header definitions
 ///
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
+#[derive(Debug, Clone, Copy, PartialEq, Pod, Zeroable)]
 #[repr(C)]
 pub struct NewExecutableHeader {
     pub e_magic: [u8; 2],
@@ -49,7 +50,7 @@ pub enum CPU {
     I8087 = 0x0007,
 }
 impl CPU {
-    pub fn get_from(flags: u16) -> CPU {
+    pub fn from(flags: u16) -> CPU {
         match flags {
             0x0004 => CPU::I8086,
             0x0005 => CPU::I286,
@@ -71,20 +72,91 @@ impl NewExecutableHeader {
 
         Ok(bytemuck::cast(buf))
     }
-    /// Returns the check magic of [`NewExecutableHeader`].
-    ///
-    /// # Errors
-    /// This function will return an error if header contains
-    /// unexpected magic number.
-    pub(crate) fn is_valid_magic(&self) -> bool {
+    pub fn is_valid_magic(&self) -> bool {
         match u16::from_le_bytes(self.e_magic) {
             exe286::NE_CIGAM => true,
             exe286::NE_MAGIC => true,
             _ => false,
         }
     }
-    pub(crate) fn get_flags(&self) -> Vec<String> {
-        let mut flags = Vec::new();
-        flags
+    pub fn module_flags(&self) -> ModuleFlags {
+        ModuleFlags {
+            linkage_errors: self.e_flags & 0x8000 != 0,
+            library_module: self.e_flags & 0x0002 != 0,
+            protected_mode_only: self.e_flags & 0x0008 != 0,
+            data_segment: DataSegment::from(self.e_flags),
+            app_flags: ModuleWindowing::from(self.e_flags),
+        }
+    }
+}
+
+/// One `WORD` field `e_flags` contains 2 categories
+/// named "Program Flags" and "Application Flags". This information
+/// applies since Windows 3.1 and SDK was released.
+///
+/// High and Low hexadecimal digits belongs to Program-flags
+/// ```
+/// // 0x0000
+/// //   ^  ^
+/// //   are program flags byte-mask
+/// ```
+/// They are contains information about target CPU and special
+/// characteristics (e.g. single `.DATA` segment or DS is missing at all)
+///
+/// Digits between describes module as OS Application. (e.g. "App uses Win16 API")
+///
+/// ```
+/// // 0x0000
+/// //    ^^
+/// //    are application flags byte-mask
+/// ```
+///
+#[derive(Debug, Clone)]
+pub struct ModuleFlags {
+    /// 
+    library_module: bool,
+    data_segment: DataSegment,
+    app_flags: ModuleWindowing,
+    linkage_errors: bool,
+    protected_mode_only: bool,
+}
+#[derive(Debug, Clone)]
+enum DataSegment {
+    /// Data segment is missing
+    No = 0x0000,
+    /// Shared among processes (application instances)
+    Single = 0x0001,
+    /// For each application instances will be made
+    /// new data segment.
+    Multiple = 0x0002,
+}
+#[derive(Debug, Clone)]
+enum ModuleWindowing {
+    /// Module doesn't use Windows PM API
+    None = 0x0000,
+    /// Application runs in "full-screen" mode
+    FullScreen = 0x0010,
+    /// Application could run with Windows PM API
+    CompatWinAPI = 0x0020,
+    /// Application requires installed Windows PM API
+    UseWinAPI = 0x0030,
+}
+impl ModuleWindowing {
+    pub fn from(f: u16) -> Self {
+        match f & 0x00FF {
+            0x0001 => ModuleWindowing::FullScreen,
+            0x0002 => ModuleWindowing::CompatWinAPI,
+            0x0003 => ModuleWindowing::UseWinAPI,
+            _ => ModuleWindowing::None,
+        }
+    }
+}
+impl DataSegment {
+    pub fn from(f: u16) -> Self {
+        match f & 0x0000 {
+            1 => DataSegment::Single,
+            2 => DataSegment::Multiple,
+            _ => DataSegment::No,
+        }
     }
 }

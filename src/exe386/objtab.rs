@@ -1,3 +1,9 @@
+//! This module represents structure and implementation details of `ObjectsTable`.
+//! Linear executables contain segments where code or data stores. Segments like in NE format
+//! may be normal (`CODE32`, `DATA32` segments) or compressed/iterated.
+//! 
+//! Objects are unnamed and permissions of them `LNK386.EXE` puts in characteristics.
+//! Field which named `flags` stores characteristics for each object.
 use bytemuck::{Pod, Zeroable};
 use std::io::{Error, Read, Seek, SeekFrom};
 
@@ -25,23 +31,23 @@ impl Object {
         }
     }
 }
-// OBJ_READABLE        0x0001
-// OBJ_WRITEABLE       0x0002
-// OBJ_EXECUTABLE      0x0004
-// OBJ_RESOURCE        0x0008
-// OBJ_DISCARDABLE     0x0010
-// OBJ_SHARABLE        0x0020
-// OBJ_HAS_PRELOAD     0x0040
-// OBJ_HAS_INVALID     0x0080
-// OBJ_PERM_SWAPPABLE  0x0100  /* LE */
-// OBJ_HAS_ZERO_FILL   0x0100  /* LX */
-// OBJ_PERM_RESIDENT   0x0200
-// OBJ_PERM_CONTIGUOUS 0x0300  /* LX */
-// OBJ_PERM_LOCKABLE   0x0400
-// OBJ_ALIAS_REQUIRED  0x1000
-// OBJ_BIG             0x2000
-// OBJ_CONFORMING      0x4000
-// OBJ_IOPL            0x8000
+const OBJ_READABLE: u16 =        0x0001;
+const OBJ_WRITEABLE: u16 =       0x0002;
+const OBJ_EXECUTABLE: u16 =      0x0004;
+const OBJ_RESOURCE: u16 =        0x0008;
+const OBJ_DISCARDABLE: u16 =     0x0010;
+const OBJ_SHARABLE: u16 =        0x0020;
+const OBJ_HAS_PRELOAD: u16 =     0x0040;
+const OBJ_HAS_INVALID: u16 =     0x0080;
+const OBJ_PERM_SWAPPABLE: u16 =  0x0100;  /* LE */
+const OBJ_HAS_ZERO_FILL: u16 =   0x0100;  /* LX */
+const OBJ_PERM_RESIDENT: u16 =   0x0200;
+const OBJ_PERM_CONTIGUOUS: u16 = 0x0300;  /* LX */
+const OBJ_PERM_LOCKABLE: u16 =   0x0400;
+const OBJ_ALIAS_REQUIRED: u16 =  0x1000;
+const OBJ_BIG: u16 =             0x2000;
+const OBJ_CONFORMING: u16 =      0x4000;
+const OBJ_IOPL: u16 =            0x8000;
 pub enum LXObjectRights {
     /// Rights of "code32" section
     ///  - READ

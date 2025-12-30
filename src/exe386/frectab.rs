@@ -1,3 +1,4 @@
+//! This module represents API of Fixup records table
 use crate::exe386::fpagetab::FixupPageTable;
 use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom};
 
@@ -82,7 +83,7 @@ impl FixupRecordsTable {
         let mut records = Vec::new();
         reader.seek(SeekFrom::Start(fixup_record_table_offset))?;
 
-        for (logical_page, &page_offset) in fixup_page_table.page_offsets.iter().enumerate() {
+        for (logical_page, &page_offset) in fixup_page_table.page_offsets.as_slice().iter().enumerate() {
             let record_offset = fixup_record_table_offset + page_offset as u64;
             reader.seek(SeekFrom::Start(record_offset))?;
 
@@ -91,6 +92,7 @@ impl FixupRecordsTable {
 
             let next_offset = fixup_page_table
                 .page_offsets
+                .as_slice()
                 .get(logical_page + 1)
                 .copied()
                 .unwrap_or(fixup_page_table.end_of_fixup_records);

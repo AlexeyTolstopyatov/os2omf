@@ -5,7 +5,7 @@ use std::io::{Read, Seek, SeekFrom};
 
 #[derive(Debug, Clone)]
 pub struct MzRelocationTable {
-    relocations: Vec<FarPointer>,
+    pub relocations: Vec<FarPointer>,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Zeroable, Pod)]

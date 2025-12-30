@@ -1,3 +1,4 @@
+//! This module represents structure and methods of EntryTable
 use std::io;
 use std::io::{Read, Seek, SeekFrom};
 
@@ -18,8 +19,8 @@ pub enum BundleType {
     Forwarder,
     Unknown(u8),
 }
-impl From<u8> for BundleType {
-    fn from(value: u8) -> Self {
+impl BundleType {
+    pub fn from(value: u8) -> Self {
         match value & 0x7F {
             0x00 => BundleType::Unused,
             0x01 => BundleType::Entry16,

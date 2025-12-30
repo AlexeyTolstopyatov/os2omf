@@ -162,7 +162,7 @@ impl NewExecutableLayout {
             segments.push(seg);
         }
 
-        for (i, s) in segments.iter().enumerate() {
+        for (i, s) in segments.as_slice().iter().enumerate() {
             imp_list.push(ImportsTable::read(
                 &mut reader,
                 &s.relocs,

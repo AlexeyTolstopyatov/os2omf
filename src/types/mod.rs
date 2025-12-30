@@ -15,8 +15,9 @@ use std::fmt::Debug;
 ///                    bytes[13] - 'g'
 /// ```
 ///
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub(crate) struct PascalString {
+pub struct PascalString {
     length: u8,
     string: Vec<u8>,
 }

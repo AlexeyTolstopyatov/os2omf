@@ -1,19 +1,20 @@
+
 use crate::exe386::frectab::{FixupRecord, FixupTarget};
 use crate::types::PascalString;
 use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom};
 
 #[derive(Debug)]
 pub enum ImportError {
-    Io(io::Error),
+    Io(Error),
     InvalidModuleOrdinal(u16),
     InvalidStringLength(u8),
 }
 
 #[derive(Debug, Clone)]
-pub struct ImportData<'fixups_struct> {
+pub struct ImportData<'fixup_recs> {
     pub imp_mod_offset: u64,
     pub imp_proc_offset: u64,
-    pub fixup_records: &'fixups_struct Vec<FixupRecord>,
+    pub fixup_records: &'fixup_recs Vec<FixupRecord>,
 }
 
 #[derive(Debug, Clone)]
@@ -23,7 +24,7 @@ pub struct ImportRelocationsTable {
 
 impl ImportRelocationsTable {
     pub fn imports(&self) -> &[DllImport] {
-        &self.imports
+        &self.imports.as_slice()
     }
 
     fn read_modules<T: Read + Seek>(
@@ -71,7 +72,7 @@ impl ImportRelocationsTable {
 
     fn read_bytes<T: Read>(reader: &mut T, count: usize) -> io::Result<Vec<u8>> {
         let mut buf = vec![0u8; count];
-        reader.read_exact(&mut buf)?;
+        reader.read_exact(buf.as_mut_slice())?;
         Ok(buf)
     }
 

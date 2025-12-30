@@ -1,3 +1,4 @@
+//! This module represents structure and methods of FixupPages table
 use crate::exe386::frectab::FixupRecord;
 use crate::exe386::header::LinearExecutableHeader;
 use std::io;

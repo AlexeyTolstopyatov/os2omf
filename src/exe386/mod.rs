@@ -23,8 +23,6 @@
 //! Fixup tables tells us "what pointers needs to resolve in runtime?" and object
 //! pages holds data about executable code and data which will be loaded in memory.
 //! 
-//! Things what makes "WOW"-effect usually are prepared symbolic data. Extraction of symbolic data
-//! is not easy, therefore logic of this "WOW"-effect here it is.
 //! ```rust
 //! use os2omf::exe386::LinearExecutableLayout;
 //! 

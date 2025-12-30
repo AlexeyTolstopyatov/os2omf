@@ -1,3 +1,5 @@
+//! This module represents details of `SegmentsTable` and implements
+//! methods for extracting raw bytes into big table of segments.
 use crate::exe286::segrelocs::{RelocationTable, RelocationType};
 use crate::types::PascalString;
 use std::io::{self, Read, Seek, SeekFrom};
@@ -26,7 +28,7 @@ impl Segment {
         let header = SegmentHeader::read(reader)?;
 
         let relocs = if !header.relocations_stripped() {
-            Self::read_relocs(reader, alignment.into(), &header)?
+            Self::read_relocs(reader, alignment as u64, &header)?
         } else {
             RelocationTable {
                 rel_entries: vec![],
@@ -79,19 +81,18 @@ impl Segment {
             return Ok(());
         }
 
-        let data_offset = self.header.data_offset(self.shift_count.into());
+        let data_offset = self.header.data_offset(self.shift_count as u64);
         let data_length = self.header.data_length();
 
         reader.seek(SeekFrom::Start(data_offset))?;
         let mut data = vec![0; data_length as usize];
-        reader.read_exact(&mut data)?;
+        reader.read_exact(data.as_mut_slice())?;
         self.data = Some(data);
 
         Ok(())
     }
 }
 
-// Более идиоматичная реализация для DllImport
 impl DllImport {
     pub fn new(
         dll_name: PascalString,
@@ -116,6 +117,8 @@ pub struct ImportsTable {
     pub imp_list: Vec<DllImport>,
 }
 impl ImportsTable {
+    /// Reads run-time import symbols based on relocations,
+    /// module-reference table values and known segment's number.
     pub fn read<T: Read + Seek>(
         reader: &mut T,
         rel_tab: &RelocationTable,
@@ -157,7 +160,7 @@ impl ImportsTable {
         imp_tab: u32,
         mod_tab: u32,
     ) -> io::Result<Option<DllImport>> {
-        let mod_offset = Self::read_module_offset(reader, mod_tab, import_name.imp_mod)?;
+        let mod_offset = Self::read_module_offset(reader, mod_tab, import_name.imp_mod_index)?;
         let mod_offset = match mod_offset {
             Some(offset) => offset,
             None => return Ok(None),
@@ -227,7 +230,7 @@ impl ImportsTable {
         reader.read_exact(std::slice::from_mut(&mut mod_len))?;
 
         let mut name = vec![0; mod_len as usize];
-        reader.read_exact(&mut name)?;
+        reader.read_exact(name.as_mut_slice())?;
 
         Ok(PascalString::new(mod_len, name))
     }
@@ -248,7 +251,7 @@ impl ImportsTable {
         }
 
         let mut name = vec![0; proc_len as usize];
-        reader.read_exact(&mut name)?;
+        reader.read_exact(name.as_mut_slice())?;
 
         Ok(PascalString::new(proc_len, name))
     }

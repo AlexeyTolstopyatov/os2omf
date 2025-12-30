@@ -1,5 +1,4 @@
-// Non-Resident names table. (look at the header specs)
-use crate::exe286::header::NewExecutableHeader;
+//! This module represents methods for extract non-resident names from file
 use crate::types::PascalString;
 use std::io::{self, Read, Seek, SeekFrom};
 
@@ -24,6 +23,8 @@ pub struct NonResidentNameTable {
 }
 
 impl NonResidentNameTable {
+    /// Reads all known non-resident names and returns vector
+    /// of symbols by known address
     pub fn read<R: Read + Seek>(reader: &mut R, e_nres_tab: u32) -> io::Result<Self> {
         let mut entries = Vec::new();
         // In practice, we don't need actually `e_cbnres` field from NE header.
@@ -47,6 +48,7 @@ pub struct NonResidentNameEntry {
     pub ordinal: u16,
 }
 
+#[warn(duplicate_macro_attributes)]
 impl NonResidentNameEntry {
     pub fn read<TRead: Read>(r: &mut TRead) -> io::Result<Option<Self>> {
         let len = {
@@ -59,7 +61,7 @@ impl NonResidentNameEntry {
         }
         let name = {
             let mut name = vec![0; len as usize];
-            r.read_exact(&mut name)?;
+            r.read_exact(name.as_mut_slice())?;
             name
         };
         let index = {

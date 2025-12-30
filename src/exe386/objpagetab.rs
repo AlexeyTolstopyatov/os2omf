@@ -3,6 +3,8 @@ use bytemuck::{Pod, Zeroable};
 use std::io;
 use std::io::{Error, Read, Seek, SeekFrom};
 
+type U24 = [u8; 3];
+
 #[derive(Debug)]
 pub struct ObjectPagesTable {
     pub pages: Vec<ObjectPage>,
@@ -16,7 +18,7 @@ pub enum ObjectPage {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 pub struct LEObjectPageHeader {
-    pub page_number: [u8; 3], // 24-bit page <-- \
+    pub page_number: U24,
     pub flags: u8,
 }
 #[repr(C)]
@@ -72,8 +74,8 @@ pub struct PageFlags {
     pub is_invalid: bool,
     pub is_zero_filled: bool,
 }
-impl From<u16> for PageFlags {
-    fn from(flags: u16) -> Self {
+impl PageFlags {
+    pub fn from(flags: u16) -> Self {
         Self {
             is_zero_filled: (flags & 0x03) != 0,
             is_invalid: (flags & 0x02) != 0,
@@ -119,7 +121,7 @@ impl LXObjectPageHeader {
         reader.seek(SeekFrom::Start(actual_offset))?;
 
         let mut data = vec![0_u8; page_entry.data_size as usize];
-        reader.read_exact(&mut data)?;
+        reader.read_exact(data.as_mut_slice())?;
 
         Ok(LXObjectPageData {
             data,

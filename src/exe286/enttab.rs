@@ -1,4 +1,26 @@
-use std::convert::TryInto;
+//! This module represents structure and method-reader of entry-table.
+//! EntryTable is a list of Entry-bundles which stores entry points.
+//! ```
+//! // +---------------+
+//! // | BUNDLE_HEADER <---- [COUNT; TYPE]
+//! // +---------------+
+//! // |+-------------+| <--+
+//! // || @1 Entry    ||    | Those bundles are bundles of one TYPE
+//! // || @2 Entry    ||    | declared in header.
+//! // || @3 Entry    ||    | If header is empty -- this is the end of entry table.
+//! // |+-------------+| <--+
+//! // | BUNDLE_HEADER |
+//! // | ...           |
+//! ```
+//! 
+//! Entry table contains only exporting entries. Entries
+//! enumerates independent on bundle. (in next bundle first entry will increment
+//! the index of previous entry from another bundle).
+//! In example last entry index was #3 then in next bundle first element will be #4.
+//! 
+//! That's why procedure ordinals not always follows one-by-one. 
+//! Unused entries enumerates too. And it helps us to make @1 export procedure
+//! and @680 exporting procedure. Space between will be big bundle of unused entries.
 use std::io::{self, Read, Seek, SeekFrom};
 
 ///

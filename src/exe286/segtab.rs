@@ -316,18 +316,18 @@ pub enum NeSegmentRights {
     ///
     BSS = 3,
 }
-const SEG_HASMASK: u16 = 0x0007;
+pub const SEG_HASMASK: u16 = 0x0007;
 ///
 /// Segment marked as moveable can be moved into another segment
 /// after application loads into Windows memory.
 ///
-const SEG_MOVABLE: u16 = 0x0010;
+pub const SEG_MOVABLE: u16 = 0x0010;
 ///
 /// Data segments having this flag are read-only
 /// All segments marked as SEG_PRELOAD are loads in memory before
 /// Windows loader prepares to run application.
 ///
-const SEG_PRELOAD: u16 = 0x0040;
+pub const SEG_PRELOAD: u16 = 0x0040;
 ///
 /// If byte-mask of segment OR SEG_RELOCS gives true -
 /// next following data of segment is will be huge table of
@@ -338,12 +338,12 @@ const SEG_PRELOAD: u16 = 0x0040;
 /// If application requires FPU -> Windows emulates it and contains special
 /// marks in per-segment relocations named like "OS-Fixups".
 ///
-const SEG_RELOCS: u16 = 0x0100;
+pub const SEG_RELOCS: u16 = 0x0100;
 ///
 /// If segment marked as discardable - it can be unloaded
 /// after application runs.
 ///
-const SEG_DISCARD: u16 = 0xF000;
+pub const SEG_DISCARD: u16 = 0xF000;
 
 impl SegmentHeader {
     ///

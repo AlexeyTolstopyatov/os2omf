@@ -1,4 +1,5 @@
-
+//! This module represents custom structures and API
+//! for extraction run-time imports from module
 use crate::exe386::frectab::{FixupRecord, FixupTarget};
 use crate::types::PascalString;
 use std::io::{self, Error, ErrorKind, Read, Seek, SeekFrom};

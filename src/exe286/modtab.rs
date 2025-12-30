@@ -8,9 +8,9 @@ use std::io::{self, Read, Seek, SeekFrom};
 /// in the IMAGE_OS2_HEADER or a NE Header -- `e_cmod`
 /// ```
 /// //                                 |
-/// //     e_modtab is relative        | e_lfanew + e_modtab = file offset
+/// //     e_modtab is relative        | e_lfanew + e_modtab = file offset.
 /// //     offset from NE header       |
-/// 
+///
 /// // +---------------+ <-------------+
 /// // | 0x0001        | <-- may be "MSG" = |03|__|__|__| (skip 4 bytes)
 /// // | 0x0004        |     after "MSG" Pascal-String follows "KERNEL"

@@ -1,8 +1,24 @@
+//! This module represents Module Directives Table for Linear executables
 use crate::exe386::header::LinearExecutableHeader;
 use bytemuck::{Pod, Zeroable};
 use std::io;
 use std::io::{Read, Seek, SeekFrom};
-
+///
+/// The Module Format Directives Table is an optional table that allows additional options to be specified.
+/// It also allows for the extension of the linear EXE format by allowing additional tables of
+/// information to be added to the linear EXE module without affecting the format of the linear EXE
+/// header.
+/// Likewise, module format directives provide a place in the linear EXE module for
+/// The Module Format Directives Table is an optional table that allows additional options to be specified.
+/// It also allows for the extension of the linear EXE format by allowing additional tables of
+/// information to be added to the linear EXE module without affecting the format of the linear EXE
+/// header.
+/// Likewise, module format directives provide a place in the linear EXE module for
+/// "temporary tables" of information, such as incremental linking information and statistic information
+/// gathered on the module.
+/// When there are no module format directives for a linear EXE module, the
+/// fields in the linear EXE header referencing the module format directives table are zero.
+///
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 pub struct ModuleDirectiveRecord {
@@ -36,7 +52,14 @@ impl DirectiveType {
         }
     }
 }
-
+///
+/// The Verify Record Directive Table is an optional table.
+/// It maintains a record of the pages in the EXE file that have been
+/// fixed up and written back to the original linear EXE module, along with the module dependencies
+/// used to perform these fixups.
+/// This table provides an efficient means for verifying the virtual addresses
+/// required for the fixed up pages when the module is loaded
+///
 #[derive(Debug, Clone)]
 pub struct VerifyRecord {
     pub module_dependencies: Vec<ModuleDependency>,

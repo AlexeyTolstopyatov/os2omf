@@ -1,6 +1,7 @@
-//! This module represents API for extracting information of IA-32 real-time programs
+//! This module represents API for extracting information of i8080/i8086 programs
 //! written and linked for MS-DOS Windows OS/2 and other platforms which are having
 //! DOS trace.
+//!
 //! Programs what started with `MZ` were so close to hardware because
 //! MS-DOS 2.0...4.0 ran into IA-32 real-mode. In modern applications or libraries
 //! this called DOS header and following next real-mode application called "DOS Stub".
@@ -30,7 +31,7 @@
 //! will agree with long jumps between DOS real-mode sections of data and code and
 //! protected-mode sections of data and code.
 //! If you see anomaly long jump at `e_lfanew` it may be
-//!  - DOS Extender's runtime instead of DOS stub (DOS4GW/DOS32a/Watcom);
+//!  - DOS Extender's runtime instead of DOS stub (e.g. DOS4GW/DOS32a/Watcom);
 //!  - Windows386 self-executable archive (W3/W4);
 //!  - Invalid pointer.
 //! 
@@ -128,8 +129,6 @@ impl MzHeader {
     /// Fills header from target file using prepared
     /// binary reader instance.
     ///
-    /// @returns filled MZ executable header
-    ///
     pub fn read<TRead: Read>(r: &mut TRead) -> io::Result<Self> {
         let mut buf = [0; 0x40];
         r.read_exact(&mut buf)?;
@@ -143,11 +142,8 @@ impl MzHeader {
         Ok(header)
     }
     ///
-    /// Tries check out signature of PC-DOS
-    /// x86 real-mode executable
+    /// Tries check out signature of PC-DOS executable
     ///
-    /// @return: Optional value with Some(unit) or an io::Error prepared instance
-    ///  
     pub fn has_valid_magic(&self) -> bool {
         match self.e_magic {
             E_CIGAM => true,
@@ -157,8 +153,6 @@ impl MzHeader {
     }
     ///
     /// Tries to validate checksum set in the MZ header
-    ///
-    /// @returns: Some(unit) or prepared io::Error instance
     ///
     pub fn has_valid_crc(&self) -> bool {
         let mut pos: usize = 0;
@@ -185,8 +179,6 @@ impl MzHeader {
     /// by default.
     /// Without some extern reason pointer to the MZ relocations table
     /// not changes.
-    ///
-    /// @returns: boolean flag of "linker set relocations pointer".
     ///
     pub fn has_default_rlcptr(&self) -> bool {
         self.e_lfarlc == E_LFARLC

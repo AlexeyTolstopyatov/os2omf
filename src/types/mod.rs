@@ -36,7 +36,7 @@ impl PascalString {
     }
     #[allow(dead_code)]
     pub fn to_string(&self) -> String {
-        std::str::from_utf8(&self.string).expect("").to_string()
+        std::str::from_utf8(&self.string.as_slice()).expect("").to_string()
     }
     #[allow(dead_code)]
     pub fn to_bytes(&self) -> &[u8] {

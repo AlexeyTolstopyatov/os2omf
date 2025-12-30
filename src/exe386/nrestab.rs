@@ -1,3 +1,4 @@
+//! This module represents API of nonresident names table
 use crate::types::PascalString;
 use std::io;
 use std::io::Read;

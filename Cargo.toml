@@ -6,4 +6,3 @@ authors = ["CoffeeLake (atolstopyatov2017@vk.com)"]
 
 [dependencies]
 bytemuck = { version = "1.24.0", features = ["derive"] }
-# thiserror
